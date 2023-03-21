@@ -75,7 +75,7 @@ xhold = 0
 xmold = 0
 
 ##################### Init Virtual env. #####################
-
+visiualse_walls = False
 needle_rotation = 0
 collision = False
 
@@ -178,7 +178,11 @@ while run:
                 needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
                 hhandle = pygame.transform.rotate(hhandle_undeformed,needle_rotation)
 
-                
+            if event.key ==ord('o'):
+                visiualse_walls = True
+            if event.key ==ord('p'):
+                visiualse_walls = False
+
             '''*********** !Student can add more ***********'''
 
     ######### Read position (Haply and/or Mouse)  #########
@@ -222,7 +226,7 @@ while run:
                 collision = False
         if collision:
             break
-        
+
     print(collision)
     
     
@@ -285,15 +289,25 @@ while run:
     screenVR.blit(spine,(400,0)) #draw the spine
     screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1])) #draw the needle
 
+
+    wall_bone_1 = pygame.Rect(467,180,43,45)
+
     #visualisation of walls
-    pygame.draw.rect(screenVR,cRed,wall_skin_1)
-    pygame.draw.rect(screenVR,cRed,wall_skin_2)
-    pygame.draw.rect(screenVR,cRed,wall_skin_3)
-    pygame.draw.rect(screenVR,cRed,wall_skin_4)
+    if visiualse_walls == True:
+        #skin
+        pygame.draw.rect(screenVR,cRed,wall_skin_1)
+        pygame.draw.rect(screenVR,cRed,wall_skin_2)
+        pygame.draw.rect(screenVR,cRed,wall_skin_3)
+        pygame.draw.rect(screenVR,cRed,wall_skin_4)
+
+        #bone
+        pygame.draw.rect(screenVR,cDarkblue,wall_bone_1)
 
     #draw tip of needle
     pygame.draw.rect(screenVR,cRed,tip_needle)
  
+    
+
     
     '''*********** !Student should fill in ***********'''
 
