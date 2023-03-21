@@ -1,39 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Control in Human-Robot Interaction Assignment 1: Haptic Rendering
--------------------------------------------------------------------------------
-DESCRIPTION:
-Creates a simulated haptic device (left) and VR environment (right)
-
-The forces on the virtual haptic device are displayed using pseudo-haptics. The 
-code uses the mouse as a reference point to simulate the "position" in the 
-user's mind and couples with the virtual haptic device via a spring. the 
-dynamics of the haptic device is a pure damper, subjected to perturbations 
-from the VR environment. 
-
-IMPORTANT VARIABLES
-xc, yc -> x and y coordinates of the center of the haptic device and of the VR
-xm -> x and y coordinates of the mouse cursor 
-xh -> x and y coordinates of the haptic device (shared between real and virtual panels)
-fe -> x and y components of the force fedback to the haptic device from the virtual impedances
-
-TASKS:
-1- Implement the impedance control of the haptic device
-2- Implement an elastic element in the simulated environment
-3- Implement a position dependent potential field that simulates a bump and a hole
-4- Implement the collision with a 300x300 square in the bottom right corner 
-5- Implement the god-object approach and compute the reaction forces from the wall
-
-REVISIONS:
-Initial release MW - 14/01/2021
-Added 2 screens and Potential field -  21/01/2021
-Added Collision and compressibility (LW, MW) - 25/01/2021
-Added Haptic device Robot (LW) - 08/02/2022
-
-INSTRUCTORS: Michael Wiertlewski & Laurence Willemet & Mostafa Attala
-e-mail: {m.wiertlewski,l.willemet,m.a.a.atalla}@tudelft.nl
-"""
-
 
 import pygame
 import numpy as np
@@ -50,11 +15,11 @@ import time
 ##################### General Pygame Init #####################
 ##initialize pygame window
 pygame.init()
-window = pygame.display.set_mode((1500, 400))   ##twice 600x400 for haptic and VR
+window = pygame.display.set_mode((1200, 400))   ##twice 600x400 for haptic and VR
 pygame.display.set_caption('Virtual Haptic Device')
 
 screenHaptics = pygame.Surface((600,400))
-screenVR = pygame.Surface((900,400))
+screenVR = pygame.Surface((600,400))
 
 ##add nice icon from https://www.flaticon.com/authors/vectors-market
 icon = pygame.image.load('robot.png')
@@ -99,7 +64,9 @@ b = .8       ##Viscous of the pseudohaptic display
 ##define sprites
 hhandle = pygame.image.load('handle.png')
 needle = pygame.image.load('surgical needle small.png')
+spine = pygame.image.load('lumbar_spine.png')
 needle = pygame.transform.scale(needle,(350,45))
+spine = pygame.transform.scale(spine,(200,400))
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(48, 48)
 cursor  = pygame.Rect(0, 0, 5, 5)
 colorHaptic = cOrange ##color of the wall
@@ -298,9 +265,10 @@ while run:
     screenVR.fill(cWhite)
     '''*********** Student should fill in ***********'''
     ### here goes the visualisation of the VR sceen. 
-    
+    screenVR.blit(spine,(400,0))
     screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1]))
-   
+    
+  
         
 
     '''*********** !Student should fill in ***********'''
