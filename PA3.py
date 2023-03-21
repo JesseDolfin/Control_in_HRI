@@ -35,9 +35,7 @@ text = font.render('Virtual Haptic Device', True, (0, 0, 0),(255, 255, 255))
 textRect = text.get_rect()
 textRect.topleft = (10, 10)
 
-
 xc,yc = screenVR.get_rect().center ##center of the screen
-
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
@@ -52,21 +50,19 @@ cOrange = (255,100,0)
 cYellow = (255,255,0)
 
 
-
-
 ####Pseudo-haptics dynamic parameters, k/b needs to be <1
 k = .5      ##Stiffness between cursor and haptic display
 b = .8       ##Viscous of the pseudohaptic display
 
 
 ##################### Define sprites #####################
-
 ##define sprites
 hhandle = pygame.image.load('handle.png')
+hhandle_undeformed = hhandle.copy()
 needle = pygame.image.load('surgical needle small.png')
-spine = pygame.image.load('lumbar_spine.png')
 needle = pygame.transform.scale(needle,(350,45))
 needle_undeformed = needle.copy()
+spine = pygame.image.load('lumbar_spine.png')
 spine = pygame.transform.scale(spine,(200,400))
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(48, 48)
 cursor  = pygame.Rect(0, 0, 5, 5)
@@ -78,19 +74,10 @@ xh = np.array(haptic.center)
 xhold = 0
 xmold = 0
 
-
 ##################### Init Virtual env. #####################
-##hint use pygame.rect() to create rectangles
 
-wall = pygame.Rect(450,300,0,0,border_radius=4).inflate(300,200)
-flag = True
-top = True
-Render_height = False
-Render_wall = False
 needle_rotation = 0
-
-
-
+collision = False
 
 ##################### Detect and Connect Physical device #####################
 # USB serial microcontroller program id data:
@@ -111,7 +98,6 @@ def serial_ports():
             pass
     return result
 
-
 CW = 0
 CCW = 1
 
@@ -120,7 +106,6 @@ device = Device
 SimpleActuatorMech = Mechanisms
 pantograph = Pantograph
 robot = PShape
-   
 
 #########Open the connection with the arduino board#########
 port = serial_ports()   ##port contains the communication port or False if no device
@@ -142,8 +127,7 @@ else:
     print("No compatible device found. Running virtual environnement...")
     #sys.exit(1)
     
-
- # conversion from meters to pixels
+# conversion from meters to pixels
 window_scale = 3
 
 ##################### Main Loop #####################
@@ -158,8 +142,20 @@ robotToggle = True
 debugToggle = False
 
 center = np.array([xc,yc])    
+
+
+#add walls for collision detection
+wall_skin_1  = pygame.Rect(430,0,4,110)
+wall_skin_2  = pygame.Rect(440,110,4,155)
+wall_skin_3  = pygame.Rect(430,265,4,85)
+wall_skin_4  = pygame.Rect(420,350,4,50)
+wall_bone_1 = pygame.Rect(0,0,0,0)
+
+walls = {"skin": [wall_skin_1,wall_skin_2,wall_skin_3,wall_skin_4],"bone": [wall_bone_1]}
+
+
+
 while run:
-        
     #########Process events  (Mouse, Keyboard etc...)#########
     for event in pygame.event.get():
         ##If the window is close then quit 
@@ -171,20 +167,21 @@ while run:
             if event.key == ord('q'):   ##Force to quit
                 run = False            
             '''*********** Student can add more ***********'''
-            ##Rotate the needle
+            ##Rotate the needle and the hand of the haptic
             if event.key == ord('r'):
                 needle_rotation += 1
                 needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
+                hhandle = pygame.transform.rotate(hhandle_undeformed,needle_rotation)
+                
             if event.key == ord('e'):
                 needle_rotation -= 1
                 needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
+                hhandle = pygame.transform.rotate(hhandle_undeformed,needle_rotation)
 
                 
             '''*********** !Student can add more ***********'''
 
     ######### Read position (Haply and/or Mouse)  #########
-    
-
     ##Get endpoint position xh
     if port and haplyBoard.data_available():    ##If Haply is present
         #Waiting for the device to be available
@@ -211,9 +208,29 @@ while run:
     '''*********** Student should fill in ***********'''
     # add dynamics of the environment
     fe = np.zeros(2)  ##Environment force is set to 0 initially.
-   
+
+    #get wall position of needle
+    tip_needle = pygame.Rect(xh[0]+325,xh[1]+13,2,2)
+    
+    #checks if the tip of the needle is in collision with a rectangle stored in walls, retreive corresponding wall type aswell
+    for wall_type, wall_list in walls.items():
+        for wall in wall_list:
+            if tip_needle.colliderect(wall):
+                collision = True
+                break
+            else:
+                collision = False
+        if collision:
+            break
+        
+    print(collision)
+    
     
 
+
+
+    
+  
 
     '''*********** !Student should fill in ***********'''
     
@@ -224,7 +241,7 @@ while run:
     ######### Send forces to the device #########
     if port:
         fe[1] = -fe[1]  ##Flips the force on the Y=axis 
-        
+
         ##Update the forces of the device
         device.set_device_torques(fe)
         device.device_write_torques()
@@ -249,33 +266,36 @@ while run:
          255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255),\
          255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
 
-        
     pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
     
-
+    
     ######### Robot visualization ###################
     # update individual link position
     if robotToggle:
         robot.createPantograph(screenHaptics,xh)
         
-    
     ### Hand visualisation
     screenHaptics.blit(hhandle,(haptic.topleft[0],haptic.topleft[1]))
     pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
-    
     
     ##Render the VR surface
     screenVR.fill(cWhite)
     '''*********** Student should fill in ***********'''
     ### here goes the visualisation of the VR sceen. 
-    screenVR.blit(spine,(400,0))
-    screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1]))
+    screenVR.blit(spine,(400,0)) #draw the spine
+    screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1])) #draw the needle
+
+    #visualisation of walls
+    pygame.draw.rect(screenVR,cRed,wall_skin_1)
+    pygame.draw.rect(screenVR,cRed,wall_skin_2)
+    pygame.draw.rect(screenVR,cRed,wall_skin_3)
+    pygame.draw.rect(screenVR,cRed,wall_skin_4)
+
+    #draw tip of needle
+    pygame.draw.rect(screenVR,cRed,tip_needle)
+ 
     
-  
-        
-
     '''*********** !Student should fill in ***********'''
-
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
