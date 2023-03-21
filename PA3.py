@@ -149,7 +149,7 @@ wall_skin_1  = pygame.Rect(430,0,4,110)
 wall_skin_2  = pygame.Rect(440,110,4,155)
 wall_skin_3  = pygame.Rect(430,265,4,85)
 wall_skin_4  = pygame.Rect(420,350,4,50)
-wall_bone_1 = pygame.Rect(0,0,0,0)
+wall_bone_1 = pygame.Rect(467,180,43,45)
 
 walls = {"skin": [wall_skin_1,wall_skin_2,wall_skin_3,wall_skin_4],"bone": [wall_bone_1]}
 
@@ -289,10 +289,9 @@ while run:
     screenVR.blit(spine,(400,0)) #draw the spine
     screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1])) #draw the needle
 
+  
 
-    wall_bone_1 = pygame.Rect(467,180,43,45)
-
-    #visualisation of walls
+    #visualisation of collision boxes
     if visiualse_walls == True:
         #skin
         pygame.draw.rect(screenVR,cRed,wall_skin_1)
@@ -303,11 +302,9 @@ while run:
         #bone
         pygame.draw.rect(screenVR,cDarkblue,wall_bone_1)
 
-    #draw tip of needle
-    pygame.draw.rect(screenVR,cRed,tip_needle)
- 
+        #draw tip of needle
+        pygame.draw.rect(screenVR,cRed,tip_needle)
     
-
     
     '''*********** !Student should fill in ***********'''
 
