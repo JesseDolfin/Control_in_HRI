@@ -66,6 +66,7 @@ hhandle = pygame.image.load('handle.png')
 needle = pygame.image.load('surgical needle small.png')
 spine = pygame.image.load('lumbar_spine.png')
 needle = pygame.transform.scale(needle,(350,45))
+needle_undeformed = needle.copy()
 spine = pygame.transform.scale(spine,(200,400))
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(48, 48)
 cursor  = pygame.Rect(0, 0, 5, 5)
@@ -86,7 +87,7 @@ flag = True
 top = True
 Render_height = False
 Render_wall = False
-
+needle_rotation = 0
 
 
 
@@ -172,9 +173,11 @@ while run:
             '''*********** Student can add more ***********'''
             ##Rotate the needle
             if event.key == ord('r'):
-                needle = pygame.transform.rotate(needle,1)
+                needle_rotation += 1
+                needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
             if event.key == ord('e'):
-                needle = pygame.transform.rotate(needle,-1)
+                needle_rotation -= 1
+                needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
 
                 
             '''*********** !Student can add more ***********'''
