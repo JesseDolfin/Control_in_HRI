@@ -90,6 +90,7 @@ Render_wall = False
 
 
 
+
 ##################### Detect and Connect Physical device #####################
 # USB serial microcontroller program id data:
 def serial_ports():
@@ -168,13 +169,12 @@ while run:
                 pygame.mouse.set_visible(not pygame.mouse.get_visible())  
             if event.key == ord('q'):   ##Force to quit
                 run = False            
-            if event.key == ord('d'):
-                debugToggle = not debugToggle
-            if event.key == ord('r'):
-                robotToggle = not robotToggle
             '''*********** Student can add more ***********'''
-            ##Toggle the wall or the height map
-      
+            ##Rotate the needle
+            if event.key == ord('r'):
+                needle = pygame.transform.rotate(needle,1)
+            if event.key == ord('e'):
+                needle = pygame.transform.rotate(needle,-1)
 
                 
             '''*********** !Student can add more ***********'''
