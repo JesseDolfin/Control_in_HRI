@@ -15,11 +15,11 @@ import time
 ##################### General Pygame Init #####################
 ##initialize pygame window
 pygame.init()
-window = pygame.display.set_mode((1200, 400))   ##twice 600x400 for haptic and VR
+window = pygame.display.set_mode((1200, 600))   ##twice 600x400 for haptic and VR
 pygame.display.set_caption('Virtual Haptic Device')
 
-screenHaptics = pygame.Surface((600,400))
-screenVR = pygame.Surface((600,400))
+screenHaptics = pygame.Surface((600,600))
+screenVR = pygame.Surface((600,600))
 
 ##add nice icon from https://www.flaticon.com/authors/vectors-market
 icon = pygame.image.load('robot.png')
@@ -42,12 +42,21 @@ clock = pygame.time.Clock()
 FPS = 100   #in Hertz
 
 ##define some colors
-cWhite = (255,255,255)
-cDarkblue = (36,90,190)
-cLightblue = (0,176,240)
-cRed = (255,0,0)
+cSkin      = (210,161,140)
+cFat       = (255,174,66)
+cLig_one   = (232,229,221)
+cLig_two   = (146,146,146)
+cLig_three = (252,228,194)
+cFluid     = (255,132,115)
+cSpinal    = (255,215,0)
+cVerte     = (226,195,152)
+
 cOrange = (255,100,0)
-cYellow = (255,255,0)
+cWhite  = (255,255,255)
+
+# CEREBROSPINAL FLUID
+wall_size_factor7 = 0.15     # SPINAL CORD
+wall_size_factor8 = 0.0      # VERTEBRAE
 
 
 ####Pseudo-haptics dynamic parameters, k/b needs to be <1
@@ -58,54 +67,26 @@ b = .8       ##Viscous of the pseudohaptic display
 ##################### Define sprites #####################
 
 # Load in transparant object images and convert to alpha channel
-skin_layer      = pygame.image.load("skin.png").convert_alpha()
-fat_layer       = pygame.image.load("fat.png").convert_alpha()
-vertebra_one    = pygame.image.load("vertebra_1.png").convert_alpha()
-vertebra_two    = pygame.image.load("vertebra_2.png").convert_alpha()
-ligament_one    = pygame.image.load("ligament_1.png").convert_alpha()
-ligament_two    = pygame.image.load("ligament_2.png").convert_alpha()
-ligament_three  = pygame.image.load("ligament_3.png").convert_alpha()
-ligament_four   = pygame.image.load("ligament_4.png").convert_alpha()
-spinal_cord     = pygame.image.load("spinal_cord.png").convert_alpha()
-
-needle = pygame.image.load("surgical needle small.png").convert_alpha()
-needle = pygame.transform.scale(needle,(200,25))
+vertebrae_layer  = pygame.image.load("vertebra_test.png").convert_alpha()
+vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(140,140))
+needle           = pygame.image.load("surgical needle small.png").convert_alpha()
+needle           = pygame.transform.scale(needle,(200,25))
 
 # Create pixel masks for every object 
-skin_mask         = pygame.mask.from_surface(skin_layer)
-fat_mask          = pygame.mask.from_surface(fat_layer)
-vertebra_one_mask = pygame.mask.from_surface(vertebra_one)
-vertebra_two_mask = pygame.mask.from_surface(vertebra_two)
-spinal_cord_mask  = pygame.mask.from_surface(spinal_cord)
-
-back_mask         = pygame.mask.from_surface(skin_layer)
-needle_mask       = pygame.mask.from_surface(needle)
+vertebrae_mask   = pygame.mask.from_surface(vertebrae_layer)
+needle_mask      = pygame.mask.from_surface(needle)
 
 # Get the rectangles and obstacle locations for rendering and mask offset
-skin_position = [400, -10]
-fat_position  = [416, -10]
+skin_position  = [395, 0]
 
 
+vertebrae_rect  = vertebrae_layer.get_rect()
 
 
-back_rect    = skin_layer.get_rect()
-needle_rect  = needle.get_rect()
-ox = 400
-oy = -10
+# Mask offsets
+offsets = [[395, -5]]
 
-
-# wall_layer_one   = pygame.Rect(350,0,20,400)  ## Skin
-# wall_layer_two   = pygame.Rect(370,0,50,400)  ## Subcutaneous fat
-# wall_layer_three = pygame.Rect(420,0,100,400)  ## Supraspinous ligament
-# wall_layer_four  = pygame.Rect(520,0,30,400)  ## Interspinous ligament
-# wall_layer_five  = pygame.Rect(550,0,25,400)  ## Ligamentum flavum
-# wall_layer_six   = pygame.Rect(575,0,25,400)  ## Dural sheath
-
-
-
-
-
-haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(48, 48)
+haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(4, 4)
 cursor  = pygame.Rect(0, 0, 5, 5)
 colorHaptic = cOrange ##color of the wall
 
@@ -119,6 +100,50 @@ xmold = 0
 visiualse_walls = True
 needle_rotation = 0
 collision = False
+
+
+# Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
+simulation_space  = [[300, 600, 300], [0, 600, 600]]
+
+# Initialize adjustable scaling factors to play around with tissue size
+wall_size_factor1 = 0.05      # SKIN
+wall_size_factor2 = 0.125     # FAT
+wall_size_factor3 = 0.025     # SUPRASPINAL LIGAMENT
+wall_size_factor4 = 0.4       # INTERSPINAL LIGAMENT
+wall_size_factor5 = 0.05      # LIGAMENTUM FLAVUM
+wall_size_factor6 = 0.0375    # CEREBROSPINAL FLUID
+wall_size_factor7 = 0.075     # SPINAL CORD
+wall_size_factor8 = 0.15      # VERTEBRAE ONE
+wall_size_factor9 = 0.4       # CARTILAGE
+wall_size_factor10 = 0.15     # VERTEBRAE TWO
+
+# Vertical wall layers (x, y, width, height)
+wall_layer1  = pygame.Rect(simulation_space[0][0],simulation_space[1][0],wall_size_factor1*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer2  = pygame.Rect(wall_layer1[0]+wall_layer1[2],simulation_space[1][0],wall_size_factor2*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer3  = pygame.Rect(wall_layer2[0]+wall_layer2[2],simulation_space[1][0],wall_size_factor3*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer4  = pygame.Rect(wall_layer3[0]+wall_layer3[2],simulation_space[1][0],wall_size_factor4*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer5  = pygame.Rect(wall_layer4[0]+wall_layer4[2],simulation_space[1][0],wall_size_factor5*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer6  = pygame.Rect(wall_layer5[0]+wall_layer5[2],simulation_space[1][0],wall_size_factor6*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer7  = pygame.Rect(wall_layer6[0]+wall_layer6[2],simulation_space[1][0],wall_size_factor7*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer8  = pygame.Rect(wall_layer7[0]+wall_layer7[2],simulation_space[1][0],wall_size_factor6*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer9  = pygame.Rect(wall_layer8[0]+wall_layer8[2],simulation_space[1][0],wall_size_factor3*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer10 = pygame.Rect(wall_layer9[0]+wall_layer9[2],simulation_space[1][0],wall_size_factor9*(simulation_space[0][2]),simulation_space[1][2])
+wall_layer11 = pygame.Rect(wall_layer10[0]+wall_layer10[2],simulation_space[1][0],wall_size_factor3*(simulation_space[0][2]),simulation_space[1][2])
+
+# Vertebrae 
+wall_layer12 = pygame.Rect(wall_layer9[0]+wall_layer9[2],simulation_space[1][0],wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
+wall_layer13 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
+wall_layer14 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer13[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
+wall_layer15 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer14[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
+wall_layer16 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer15[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
+
+# # Store all objects in dictonary
+objects = {'Skin': wall_layer1, 'Fat': wall_layer2, 'Supraspinal ligament one': wall_layer3, 'Interspinal ligament': wall_layer4,
+           'Ligamentum flavum': wall_layer5, 'Cerebrospinal fluid one': wall_layer6, 'Spinal cord': wall_layer7,
+            'Cerebrospinal fluid two': wall_layer8, 'Supraspinal ligament two':  wall_layer9, 'Cartilage': wall_layer10,
+              'Supraspinal ligament three': wall_layer11, 'Vertebrae one': wall_layer12, 'Vertebrae two': wall_layer13,
+              'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16}
+
 
 ##################### Detect and Connect Physical device #####################
 # USB serial microcontroller program id data:
@@ -184,19 +209,6 @@ debugToggle = False
 
 center = np.array([xc,yc])    
 
-
-# Add walls for collision detection and tissue definition
-# wall_layer_one   = pygame.Rect(350,0,20,400)  ## Skin
-# wall_layer_two   = pygame.Rect(370,0,50,400)  ## Subcutaneous fat
-# wall_layer_three = pygame.Rect(420,0,100,400)  ## Supraspinous ligament
-# wall_layer_four  = pygame.Rect(520,0,30,400)  ## Interspinous ligament
-# wall_layer_five  = pygame.Rect(550,0,25,400)  ## Ligamentum flavum
-# wall_layer_six   = pygame.Rect(575,0,25,400)  ## Dural sheath
-
-
-# walls = {"skin": [wall_layer_one,wall_layer_two,wall_layer_three,wall_layer_four,wall_layer_five,wall_layer_six],"bone": [wall_layer_one]}
-
-
 while run:
     #########Process events  (Mouse, Keyboard etc...)#########
     for event in pygame.event.get():
@@ -247,23 +259,32 @@ while run:
     # add dynamics of the environment
     fe = np.zeros(2)  ##Environment force is set to 0 initially.
 
-    #get wall position of needle
-    tip_needle = pygame.Rect(xh[0]+325,xh[1]+13,2,2)
+    # #get wall position of needle
+    # tip_needle = pygame.Rect(xh[0]+325,xh[1]+13,2,2)
     
-    # Get needle pos
-    needle_pos = [haptic.topleft[0],haptic.topleft[1]]
+    # # Get needle pos
+    # needle_pos = [haptic.topleft[0],haptic.topleft[1]]
     
-    # # Compute offset between two masks
-    offset = [needle_pos[0]-ox, needle_pos[1]-oy]
+    # # offset_list = []
+    # # for offset in offsets:
+    # #     distance = [needle_pos[0]-offset[0], needle_pos[1]-offset[1]]
+    # #     offset_list.append(distance)
+    
+    
 
-    # Check if overlap occurs betweens masks
-    collision = back_mask.overlap(needle_mask, offset)
-    if collision:
-        print("collision")
-    if not collision:
-        print("no collision")
-    # if pygame.sprite.collide_mask(back_mask, needle_mask):
-    #     print("collide")
+    # COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE
+
+    # # Check if overlap occurs betweens masks
+    # collision1 = skin_mask.overlap(needle_mask, offset_list[0])
+
+    for value in objects:
+        Collision = haptic.colliderect(objects[value])
+        if Collision:
+            print("Oh no! We touched:", value)
+
+
+
+
 
     '''*********** !Student should fill in ***********'''
     
@@ -312,45 +333,45 @@ while run:
     
     ##Render the VR surface
     screenVR.fill(cWhite)
+
     '''*********** Student should fill in ***********'''
-    ### here goes the visualisation of the VR sceen. 
+    ### Visualize all components of the simulation
+
+    # Draw all the vertical tissue layers
+    pygame.draw.rect(screenVR,cSkin,wall_layer1, border_radius = 2)
+    pygame.draw.rect(screenVR,cFat,wall_layer2,  border_radius = 2)
+    pygame.draw.rect(screenVR,cLig_one,wall_layer3, border_radius = 2)
+    pygame.draw.rect(screenVR,cLig_two,wall_layer4,border_radius = 2)
+    pygame.draw.rect(screenVR,cLig_three,wall_layer5,border_radius = 2)
+    pygame.draw.rect(screenVR,cFluid,wall_layer6,border_radius = 2)
+    pygame.draw.rect(screenVR,cSpinal,wall_layer7,border_radius = 2)
+    pygame.draw.rect(screenVR,cFluid,wall_layer8,border_radius = 2)
+    pygame.draw.rect(screenVR,cLig_one,wall_layer9, border_radius = 2)
+    pygame.draw.rect(screenVR,cLig_two,wall_layer10, border_radius = 2)
+    pygame.draw.rect(screenVR,cLig_one,wall_layer11, border_radius = 2)
+    
+    # Draw all the vertebrae
+    pygame.draw.rect(screenVR,cVerte,wall_layer12, border_radius = 4)
+    pygame.draw.rect(screenVR,cVerte,wall_layer13, border_radius = 4)
+    pygame.draw.rect(screenVR,cVerte,wall_layer14, border_radius = 4)
+    pygame.draw.rect(screenVR,cVerte,wall_layer15, border_radius = 4)
+    pygame.draw.rect(screenVR,cVerte,wall_layer16, border_radius = 4)
 
     
-
-
+    # Draw the masks  
+    pygame.draw.rect(screenVR, colorHaptic, haptic, border_radius=8) #draw the needle
     
-
-
-    screenVR.blit(skin_layer,(395,-5)) #draw the spine
-    screenVR.blit(fat_layer,(402,-5)) #draw the spine
-    screenVR.blit(ligament_one,(441,-5)) #draw the spine
-
-
-    screenVR.blit(ligament_two,(462,-7)) #draw the spine
-    screenVR.blit(vertebra_two,(455,-5)) #draw the spine
-    # screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1])) #draw the needle
-
-    screenVR.blit(ligament_three,(545,-5))  #draw the first layer
-    screenVR.blit(ligament_four,(525,-6))  #draw the first layer
-
-    screenVR.blit(spinal_cord,(552,-2)) #draw the spine
-
-    # if visiualse_walls == True:
-    #     #skin
-    #     pygame.draw.rect(screenVR,cRed,wall_layer_one)
-    #     pygame.draw.rect(screenVR,cDarkblue,wall_layer_two)
-    #     pygame.draw.rect(screenVR,cRed,wall_layer_three)
-    #     pygame.draw.rect(screenVR,cDarkblue,wall_layer_four)
-
-        # #bone
-        # pygame.draw.rect(screenVR,cDarkblue,wall_layer_one)
-
-        # #draw tip of needle
-        # pygame.draw.rect(screenVR,cRed,tip_needle)
-
-        
+    vert_pos_one   = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_pos_two   = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_pos_three = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_pos_four  = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_pos_five  = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
     
-    
+    screenVR.blit(vertebrae_layer,(vert_pos_one[0],vert_pos_one[1])) #draw the needle
+    screenVR.blit(vertebrae_layer,(vert_pos_two[0],vert_pos_two[1]))
+    screenVR.blit(vertebrae_layer,(vert_pos_three[0],vert_pos_three[1]))
+    screenVR.blit(vertebrae_layer,(vert_pos_four[0],vert_pos_four[1]))
+    screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))
     '''*********** !Student should fill in ***********'''
 
     ##Fuse it back together
@@ -368,7 +389,8 @@ while run:
         window.blit(text, textRect)
 
 
-    pygame.display.flip()    
+    pygame.display.flip()   
+
     ##Slow down the loop to match FPS
     clock.tick(FPS)
 
