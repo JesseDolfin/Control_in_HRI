@@ -12,6 +12,23 @@ from serial.tools import list_ports
 import time
 
 
+def rotate(surface, angle, pivot, offset):
+    """Rotate the surface around the pivot point.
+
+    Args:
+        surface (pygame.Surface): The surface that is to be rotated.
+        angle (float): Rotate by this angle.
+        pivot (tuple, list, pygame.math.Vector2): The pivot point.
+        offset (pygame.math.Vector2): This vector is added to the pivot.
+    """
+    rotated_image = pygame.transform.rotozoom(surface, -angle, 1)  # Rotate the image.
+    rotated_offset = offset.rotate(angle)  # Rotate the offset vector.
+    # Add the offset vector to the center/pivot point to shift the rect.
+    rect = rotated_image.get_rect(center=pivot+rotated_offset)
+    return rotated_image, rect  # Return the rotated image and shifted rect
+
+
+
 ##################### General Pygame Init #####################
 ##initialize pygame window
 pygame.init()
@@ -50,17 +67,12 @@ cOrange = (255,100,0)
 cYellow = (255,255,0)
 
 
-####Pseudo-haptics dynamic parameters, k/b needs to be <1
-k = .5      ##Stiffness between cursor and haptic display
-b = .8       ##Viscous of the pseudohaptic display
-
-
 ##################### Define sprites #####################
 ##define sprites
 hhandle = pygame.image.load('handle.png')
 hhandle_undeformed = hhandle.copy()
 needle = pygame.image.load('surgical needle small.png')
-needle = pygame.transform.scale(needle,(350,45))
+needle = pygame.transform.scale(needle,(350,46))
 needle_undeformed = needle.copy()
 spine = pygame.image.load('lumbar_spine.png')
 spine = pygame.transform.scale(spine,(200,400))
@@ -79,24 +91,9 @@ visiualse_walls = False
 needle_rotation = 0
 collision = False
 
-##################### Detect and Connect Physical device #####################
-# USB serial microcontroller program id data:
-def serial_ports():
-    """ Lists serial port names """
-    ports = list(serial.tools.list_ports.comports())
 
-    result = []
-    for p in ports:
-        try:
-            port = p.device
-            s = serial.Serial(port)
-            s.close()
-            if p.description[0:12] == "Arduino Zero":
-                result.append(port)
-                print(p.description[0:12])
-        except (OSError, serial.SerialException):
-            pass
-    return result
+k = 0.5
+
 
 CW = 0
 CCW = 1
@@ -107,26 +104,6 @@ SimpleActuatorMech = Mechanisms
 pantograph = Pantograph
 robot = PShape
 
-#########Open the connection with the arduino board#########
-port = serial_ports()   ##port contains the communication port or False if no device
-if port:
-    print("Board found on port %s"%port[0])
-    haplyBoard = Board("test", port[0], 0)
-    device = Device(5, haplyBoard)
-    pantograph = Pantograph()
-    device.set_mechanism(pantograph)
-    
-    device.add_actuator(1, CCW, 2)
-    device.add_actuator(2, CW, 1)
-    
-    device.add_encoder(1, CCW, 241, 10752, 2)
-    device.add_encoder(2, CW, -61, 10752, 1)
-    
-    device.device_set_parameters()
-else:
-    print("No compatible device found. Running virtual environnement...")
-    #sys.exit(1)
-    
 # conversion from meters to pixels
 window_scale = 3
 
@@ -135,11 +112,21 @@ window_scale = 3
 ##TODO - Perhaps it needs to be changed by a timer for real-time see: 
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
+#add booleans
 run = True
 ongoingCollision = False
 fieldToggle = True
 robotToggle = True
 debugToggle = False
+
+# initial conditions
+K = np.diag([1000,1000]) # stiffness matrix N/m
+p = np.array([0.1,0.1]) # actual endpoint position
+dp = np.zeros(2) # actual endpoint velocity
+F = np.zeros(2) # endpoint force
+m = 0.5
+i = 0
+t = 0.0 # time
 
 center = np.array([xc,yc])    
 
@@ -154,9 +141,12 @@ wall_bone_1 = pygame.Rect(467,180,43,45)
 walls = {"skin": [wall_skin_1,wall_skin_2,wall_skin_3,wall_skin_4],"bone": [wall_bone_1]}
 
 
+# SIMULATION PARAMETERS
+dt = 0.01 # intergration step timedt = 0.01 # integration step time
+dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
 
 while run:
-    #########Process events  (Mouse, Keyboard etc...)#########
+    '''#########Process events  (Mouse, Keyboard etc...)#########'''
     for event in pygame.event.get():
         ##If the window is close then quit 
         if event.type == pygame.QUIT:
@@ -166,130 +156,75 @@ while run:
                 pygame.mouse.set_visible(not pygame.mouse.get_visible())  
             if event.key == ord('q'):   ##Force to quit
                 run = False            
-            '''*********** Student can add more ***********'''
-            ##Rotate the needle and the hand of the haptic
+          
+            ##Rotate the needle 
             if event.key == ord('r'):
                 needle_rotation += 1
-                needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
-                hhandle = pygame.transform.rotate(hhandle_undeformed,needle_rotation)
-                
+              
             if event.key == ord('e'):
                 needle_rotation -= 1
-                needle = pygame.transform.rotate(needle_undeformed,needle_rotation)
-                hhandle = pygame.transform.rotate(hhandle_undeformed,needle_rotation)
 
             if event.key ==ord('o'):
                 visiualse_walls = True
             if event.key ==ord('p'):
                 visiualse_walls = False
 
-            '''*********** !Student can add more ***********'''
-
-    ######### Read position (Haply and/or Mouse)  #########
-    ##Get endpoint position xh
-    if port and haplyBoard.data_available():    ##If Haply is present
-        #Waiting for the device to be available
-        #########Read the motorangles from the board#########
-        device.device_read_data()
-        motorAngle = device.get_device_angles()
-        
-        #########Convert it into position#########
-        device_position = device.get_device_position(motorAngle)
-        xh = np.array(device_position)*1e3*window_scale
-        xh[0] = np.round(-xh[0]+300)
-        xh[1] = np.round(xh[1]-60)
-        xm = xh     ##Mouse position is not used
-         
-    else:
-        ##Compute distances and forces between blocks
-        xh = np.clip(np.array(haptic.center),0,599)
-        xh = np.round(xh)
-        
-        ##Get mouse position
-        cursor.center = pygame.mouse.get_pos()
-        xm = np.clip(np.array(cursor.center),0,599)
-    
-    '''*********** Student should fill in ***********'''
+    '''Dynamics'''
     # add dynamics of the environment
-    fe = np.zeros(2)  ##Environment force is set to 0 initially.
+    F = np.zeros(2)  ##Environment force is set to 0 initially.
 
-    #get wall position of needle
-    tip_needle = pygame.Rect(xh[0]+325,xh[1]+13,2,2)
-    
-    #checks if the tip of the needle is in collision with a rectangle stored in walls, retreive corresponding wall type aswell
-    for wall_type, wall_list in walls.items():
-        for wall in wall_list:
-            if tip_needle.colliderect(wall):
-                collision = True
-                break
-            else:
-                collision = False
-        if collision:
-            break
+    cursor = pygame.mouse.get_pos() 
+    pr = cursor # in the first case cursor pos is also reference pos (will change if we do this via udp)
 
-    print(collision)
+    # spring force calculation
+    Fs = K @ (pr-p) 
     
+    # damping force calculation
+    D = 2*0.7*np.sqrt(K)
+    Fd = D @ dp
+   
+    #endpoint force
+    F = Fs - Fd
+    
+    ddp = F/m
+    dp += ddp*dt
+    p += dp*dt
+    t += dt
+
+    i = i + 1
     
 
-
-
-    
-  
-
-    '''*********** !Student should fill in ***********'''
-    
-    ##Update old samples for velocity computation
-    xhold = xh
-    xmold = xm
-    
-    ######### Send forces to the device #########
-    if port:
-        fe[1] = -fe[1]  ##Flips the force on the Y=axis 
-
-        ##Update the forces of the device
-        device.set_device_torques(fe)
-        device.device_write_torques()
-        #pause for 1 millisecond
-        time.sleep(0.001)
-    else:
-        ######### Update the positions according to the forces ########
-        ##Compute simulation (here there is no inertia)
-        ##If the haply is connected xm=xh and dxh = 0
-        dxh = (k/b*(xm-xh)/window_scale -fe/b)    ####replace with the valid expression that takes all the forces into account
-        dxh = dxh*window_scale
-        xh = np.round(xh+dxh)             ##update new positon of the end effector
-        
-    haptic.center = xh 
-    
     ######### Graphical output #########
     ##Render the haptic surface
     screenHaptics.fill(cWhite)
     
     ##Change color based on effort
     colorMaster = (255,\
-         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255),\
-         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
+         255-np.clip(np.linalg.norm(k*(p-pr)/window_scale)*15,0,255),\
+         255-np.clip(np.linalg.norm(k*(p-pr)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
 
-    pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
-    
-    
+    pygame.draw.rect(screenHaptics, colorMaster, (pr[0]-20,pr[1]-20,40,40),border_radius=4)
+ 
+
+
     ######### Robot visualization ###################
     # update individual link position
     if robotToggle:
-        robot.createPantograph(screenHaptics,xh)
+        robot.createPantograph(screenHaptics,pr)
         
-    ### Hand visualisation
-    screenHaptics.blit(hhandle,(haptic.topleft[0],haptic.topleft[1]))
-    pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
-    
+
+
+    '''here goes the visualisation of the VR sceen'''
     ##Render the VR surface
     screenVR.fill(cWhite)
-    '''*********** Student should fill in ***********'''
-    ### here goes the visualisation of the VR sceen. 
-    screenVR.blit(spine,(400,0)) #draw the spine
-    screenVR.blit(needle,(haptic.topleft[0],haptic.topleft[1])) #draw the needle
+    #define center of needle
+    pivot = [p[0]+175, p[1]+23]
+    offset = pygame.math.Vector2(0, 0)
 
-  
+    rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
+
+    screenVR.blit(spine,(400,0)) #draw the spine
+    screenVR.blit(rotated_image,rect) #draw the needle
 
     #visualisation of collision boxes
     if visiualse_walls == True:
@@ -301,28 +236,14 @@ while run:
 
         #bone
         pygame.draw.rect(screenVR,cDarkblue,wall_bone_1)
-
-        #draw tip of needle
-        pygame.draw.rect(screenVR,cRed,tip_needle)
     
     
-    '''*********** !Student should fill in ***********'''
-
+    pygame.draw.rect(screenVR,cRed,(p[0],p[1],1,1))
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
     window.blit(screenVR, (600,0))
 
-    ##Print status in  overlay
-    if debugToggle: 
-        
-        text = font.render("FPS = " + str(round(clock.get_fps())) + \
-                            "  xm = " + str(np.round(10*xm)/10) +\
-                            "  xh = " + str(np.round(10*xh)/10) +\
-                            "  fe = " + str(np.round(10*fe)/10) \
-                            , True, (0, 0, 0), (255, 255, 255))
-        window.blit(text, textRect)
-
-
+    
     pygame.display.flip()    
     ##Slow down the loop to match FPS
     clock.tick(FPS)
