@@ -10,6 +10,16 @@ from pshape import PShape
 import sys, serial, glob
 from serial.tools import list_ports
 import time
+def bone_colision(p,collision_bone,pr,flag):
+    if collision_bone and flag:
+        phold = p
+        flag = False
+       
+
+    if pr[0] > phold[0] and not flag:
+         ddp = 0
+    else:
+        flag = True
 
 
 def rotate(surface, angle, pivot, offset):
@@ -91,9 +101,7 @@ visiualse_walls = False
 needle_rotation = 0
 collision = False
 
-
 k = 0.5
-
 
 CW = 0
 CCW = 1
@@ -144,7 +152,11 @@ walls = {"skin": [wall_skin_1,wall_skin_2,wall_skin_3,wall_skin_4],"bone": [wall
 # SIMULATION PARAMETERS
 dt = 0.01 # intergration step timedt = 0.01 # integration step time
 dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
-
+flag = True
+collision_bone = False
+phold = np.zeros(2)
+ddp = np.zeros(2)
+p = np.zeros(2)
 while run:
     '''#########Process events  (Mouse, Keyboard etc...)#########'''
     for event in pygame.event.get():
@@ -169,6 +181,9 @@ while run:
             if event.key ==ord('p'):
                 visiualse_walls = False
 
+            if event.key ==ord('k'):
+                collision_bone = True
+
     '''Dynamics'''
     # add dynamics of the environment
     F = np.zeros(2)  ##Environment force is set to 0 initially.
@@ -186,10 +201,29 @@ while run:
     #endpoint force
     F = Fs - Fd
     
+    
+
     ddp = F/m
+
+
+    if collision_bone and flag:
+        phold = p
+        flag = False
+        print("hello")
+       
+    
+    if (pr[0] >= phold[0]) and (not flag):
+         ddp = 0
+         print("hi")
+    else:
+        flag = True
+
     dp += ddp*dt
     p += dp*dt
     t += dt
+
+
+    
 
     i = i + 1
     
