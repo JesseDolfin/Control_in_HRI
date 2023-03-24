@@ -216,6 +216,8 @@ ongoingCollision = False
 fieldToggle = True
 robotToggle = True
 debugToggle = False
+vert_col = False
+flag = True
 
 center = np.array([xc,yc])    
 
@@ -226,6 +228,7 @@ p = np.array([0.1,0.1]) # actual endpoint position
 dp = np.zeros(2) # actual endpoint velocity
 ddp = np.zeros(2)
 phold = np.zeros(2)
+pold = np.zeros(2)
 F = np.zeros(2) # endpoint force
 m = 0.5
 i = 0
@@ -335,25 +338,41 @@ while run:
     vert4_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset4, yoffset4))
     vert5_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset5, yoffset5))
     
+    
     if vert1_collision:
-        print("Collision vert one")
+        #print("Collision vert one")
+        vert_col = True
+    
     elif vert2_collision:
-        print("Collision vert two")
+        #print("Collision vert two")
+        vert_col = True
+   
     elif vert3_collision:
-        print("Collision vert three")
+        #print("Collision vert three")
+        vert_col = True
+        
     elif vert4_collision:
-        print("Collision vert four")
+        #print("Collision vert four")
+        vert_col = True
+        
     elif vert5_collision:
-        print("Collision vert five")
+        #print("Collision vert five")
+        vert_col = True
+        
     else:
-        pass
+        vert_col = False
 
-
+    if vert_col and flag:
+        pold = np.copy(p)
+        flag = False
+    
+    
     # Loop over all the objects and check for collision
     for value in objects:
         Collision = haptic_endpoint.colliderect(objects[value])
         if Collision:
-            print("Oh no! We touched:", value)
+            pass
+            #print("Oh no! We touched:", value)
 
     ######### Send forces to the device #########
     if port:
@@ -365,11 +384,14 @@ while run:
         #pause for 1 millisecond
         time.sleep(0.001)
     else:
+        if vert_col and pold[0] < pr[0]:
+            F = 0
+            dp = np.zeros(2)
         ddp = F/m
         dp += ddp*dt
         p += dp*dt
         t += dt
-    
+
     i += 1
     
     ######### Graphical output #########
