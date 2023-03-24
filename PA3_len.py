@@ -22,6 +22,7 @@ def rotate(surface, angle, pivot, offset):
     """
     rotated_image = pygame.transform.rotozoom(surface, -angle, 1)  # Rotate the image.
     rotated_offset = offset.rotate(angle)  # Rotate the offset vector.
+    
     # Add the offset vector to the center/pivot point to shift the rect.
     rect = rotated_image.get_rect(center=pivot+rotated_offset)
     return rotated_image, rect  # Return the rotated image and shifted rect
@@ -83,8 +84,8 @@ b = .8       ##Viscous of the pseudohaptic display
 # Load in transparant object images and convert to alpha channel
 vertebrae_layer  = pygame.image.load("vertebra_test.png").convert_alpha()
 vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(140,140))
-needle           = pygame.image.load("surgical needle small.png").convert_alpha()
-needle           = pygame.transform.scale(needle,(400,16))
+needle           = pygame.image.load("lumbar_needle.png").convert_alpha()
+needle           = pygame.transform.scale(needle,(200,25))
 needle_undeformed = needle.copy()
 
 # Create pixel masks for every object 
@@ -92,14 +93,7 @@ vertebrae_mask   = pygame.mask.from_surface(vertebrae_layer)
 needle_mask      = pygame.mask.from_surface(needle)
 
 # Get the rectangles and obstacle locations for rendering and mask offset
-skin_position  = [395, 0]
-
-
-vertebrae_rect  = vertebrae_layer.get_rect()
-
-
-# Mask offsets
-offsets = [[395, -5]]
+vertebrae_rect   = vertebrae_mask.get_rect()
 
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(4, 4)
 cursor  = pygame.Rect(0, 0, 5, 5)
@@ -114,6 +108,7 @@ xmold = 0
 ##################### Init Virtual env. #####################
 visiualse_walls = True
 needle_rotation = 0
+alpha = 0
 collision = False
 
 
@@ -254,8 +249,10 @@ while run:
             ##Rotate the needle
             if event.key ==ord('r'):
                 needle_rotation +=1
+                alpha += np.deg2rad(1)
             if event.key ==ord('e'):
                 needle_rotation -= 1
+                alpha -= np.deg2rad(1)
 
             #visualisation of walls
             if event.key ==ord('o'):
@@ -299,26 +296,62 @@ while run:
     F = Fs - Fd
 
 
-    # #get wall position of needle
-    # tip_needle = pygame.Rect(xh[0]+325,xh[1]+13,2,2)
-    
-    # # Get needle pos
-    # needle_pos = [haptic.topleft[0],haptic.topleft[1]]
-    
-    # # offset_list = []
-    # # for offset in offsets:
-    # #     distance = [needle_pos[0]-offset[0], needle_pos[1]-offset[1]]
-    # #     offset_list.append(distance)
-    
-    
 
-    # COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE
 
-    # # Check if overlap occurs betweens masks
-    # collision1 = skin_mask.overlap(needle_mask, offset_list[0])
+    ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
 
+    # Define haptic center and endpoint of our haptic
+    haptic_center   = pygame.Rect(p[0],p[1],1,1)
+    haptic_endpoint = pygame.Rect(haptic_center[0]+np.cos(alpha)*150,haptic_center[1]+np.sin(alpha)*150, 1, 1)
+
+    # Create endpoint masks for collision detection between endpoint and drawn vertebrae
+    haptic_endpoint_mask = pygame.mask.Mask((haptic_endpoint.width, haptic_endpoint.height))
+    haptic_endpoint_mask.fill()
+
+    # Compose the rectangles belonging to every vertebrae
+    vert_rect1 = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_rect2 = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_rect3 = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_rect4 = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    vert_rect5 = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+
+    # Compute offset between haptic endpoint and every vertebrae mask
+    # NOTE THIS MUST BE OPTIMIZED
+    xoffset1 = vert_rect1[0] - haptic_endpoint[0]
+    yoffset1 = vert_rect1[1] - haptic_endpoint[1]
+    xoffset2 = vert_rect2[0] - haptic_endpoint[0]
+    yoffset2 = vert_rect2[1] - haptic_endpoint[1]
+    xoffset3 = vert_rect3[0] - haptic_endpoint[0]
+    yoffset3 = vert_rect3[1] - haptic_endpoint[1]
+    xoffset4 = vert_rect4[0] - haptic_endpoint[0]
+    yoffset4 = vert_rect4[1] - haptic_endpoint[1]
+    xoffset5 = vert_rect5[0] - haptic_endpoint[0]
+    yoffset5 = vert_rect5[1] - haptic_endpoint[1]
+
+    # Check collision for every vertebrae and endpoint
+    vert1_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset1, yoffset1))
+    vert2_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset2, yoffset2))
+    vert3_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset3, yoffset3))
+    vert4_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset4, yoffset4))
+    vert5_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset5, yoffset5))
+    
+    if vert1_collision:
+        print("Collision vert one")
+    elif vert2_collision:
+        print("Collision vert two")
+    elif vert3_collision:
+        print("Collision vert three")
+    elif vert4_collision:
+        print("Collision vert four")
+    elif vert5_collision:
+        print("Collision vert five")
+    else:
+        pass
+
+
+    # Loop over all the objects and check for collision
     for value in objects:
-        Collision = haptic.colliderect(objects[value])
+        Collision = haptic_endpoint.colliderect(objects[value])
         if Collision:
             print("Oh no! We touched:", value)
 
@@ -349,16 +382,13 @@ while run:
          255-np.clip(np.linalg.norm(k*(pr-p)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
 
     pygame.draw.rect(screenHaptics, colorMaster, (pr[0]-20,pr[1]-20,40,40),border_radius=4)
-    
+
     
     ######### Robot visualization ###################
     # update individual link position
     if robotToggle:
         robot.createPantograph(screenHaptics,pr)
         
-    ### Hand visualisation
-    #pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
-    
     ##Render the VR surface
     screenVR.fill(cWhite)
 
@@ -384,27 +414,7 @@ while run:
     pygame.draw.rect(screenVR,cVerte,wall_layer15, border_radius = 4)
     pygame.draw.rect(screenVR,cVerte,wall_layer16, border_radius = 4)
 
-    
     # Draw the masks  
-   
-
-    #define center of needle
-    pivot = [p[0]+200, p[1]+8]
-    offset = pygame.math.Vector2(0, 0)
-
-    rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
-
-    #define size of needle 
-    r = 200
-    rad = needle_rotation * math.pi / 180
-
-  
-
-
-    #screenVR.blit(spine,(400,0)) #draw the spine
-    screenVR.blit(rotated_image,rect) #draw the needle
-    pygame.draw.rect(screenVR, colorHaptic, (p[0]+200+math.cos(rad)*r,p[1]+math.sin(rad)*r+8,8,8), border_radius=8) #draw the needle
-    
     vert_pos_one   = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
     vert_pos_two   = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
     vert_pos_three = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
@@ -415,7 +425,36 @@ while run:
     screenVR.blit(vertebrae_layer,(vert_pos_two[0],vert_pos_two[1]))
     screenVR.blit(vertebrae_layer,(vert_pos_three[0],vert_pos_three[1]))
     screenVR.blit(vertebrae_layer,(vert_pos_four[0],vert_pos_four[1]))
-    screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))
+    screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))  
+
+
+    # Draw the needle
+    pygame.draw.line(screenVR, cOrange, (haptic_center[0],haptic_center[1]), (haptic_center[0]+np.cos(alpha)*150, haptic_center[1]+np.sin(alpha)*150), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic_center[0],haptic_center[1]), (haptic_center[0]+np.sin(-alpha)*25, haptic_center[1]+ np.cos(-alpha)*25), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic_center[0],haptic_center[1]), (haptic_center[0]-np.sin(-alpha)*25, haptic_center[1]- np.cos(-alpha)*25), 2 )
+    
+
+
+    # #define center of needle
+    # pivot = [p[0]+200, p[1]+8]
+    # offset = pygame.math.Vector2(0, 0)
+
+    # rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
+
+    # #define size of needle 
+    # r = 200
+    # rad = needle_rotation * math.pi / 180
+
+
+    # # Needle center
+    # needle_center = rect.midright
+    # pygame.draw.circle(screenVR, colorHaptic, p, radius=40) #draw the needle
+
+
+    # screenVR.blit(rotated_image,rect) #draw the needle
+
+    # pygame.draw.rect(screenVR, colorHaptic, (p[0]+200+math.cos(rad)*r,p[1]+math.sin(rad)*r+8,8,8), border_radius=8) #draw the needle
+    
 
 
     ##Fuse it back together
