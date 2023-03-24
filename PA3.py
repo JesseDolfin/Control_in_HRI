@@ -84,8 +84,8 @@ hhandle_undeformed = hhandle.copy()
 needle = pygame.image.load('surgical needle small.png')
 needle = pygame.transform.scale(needle,(350,46))
 needle_undeformed = needle.copy()
-spine = pygame.image.load('lumbar_spine.png')
-spine = pygame.transform.scale(spine,(200,400))
+#spine = pygame.image.load('lumbar_spine.png')
+#spine = pygame.transform.scale(spine,(200,400))
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(48, 48)
 cursor  = pygame.Rect(0, 0, 5, 5)
 colorHaptic = cOrange ##color of the wall
@@ -257,7 +257,7 @@ while run:
 
     rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
 
-    screenVR.blit(spine,(400,0)) #draw the spine
+    #screenVR.blit(spine,(400,0)) #draw the spine
     screenVR.blit(rotated_image,rect) #draw the needle
 
     #visualisation of collision boxes

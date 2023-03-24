@@ -11,6 +11,20 @@ import sys, serial, glob
 from serial.tools import list_ports
 import time
 
+def rotate(surface, angle, pivot, offset):
+    """Rotate the surface around the pivot point.
+
+    Args:
+        surface (pygame.Surface): The surface that is to be rotated.
+        angle (float): Rotate by this angle.
+        pivot (tuple, list, pygame.math.Vector2): The pivot point.
+        offset (pygame.math.Vector2): This vector is added to the pivot.
+    """
+    rotated_image = pygame.transform.rotozoom(surface, -angle, 1)  # Rotate the image.
+    rotated_offset = offset.rotate(angle)  # Rotate the offset vector.
+    # Add the offset vector to the center/pivot point to shift the rect.
+    rect = rotated_image.get_rect(center=pivot+rotated_offset)
+    return rotated_image, rect  # Return the rotated image and shifted rect
 
 ##################### General Pygame Init #####################
 ##initialize pygame window
@@ -70,7 +84,8 @@ b = .8       ##Viscous of the pseudohaptic display
 vertebrae_layer  = pygame.image.load("vertebra_test.png").convert_alpha()
 vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(140,140))
 needle           = pygame.image.load("surgical needle small.png").convert_alpha()
-needle           = pygame.transform.scale(needle,(200,25))
+needle           = pygame.transform.scale(needle,(400,40))
+needle_undeformed = needle.copy()
 
 # Create pixel masks for every object 
 vertebrae_mask   = pygame.mask.from_surface(vertebrae_layer)
@@ -209,6 +224,21 @@ debugToggle = False
 
 center = np.array([xc,yc])    
 
+
+'''Intial variable declerations'''
+K = np.diag([1000,1000]) # stiffness matrix N/m
+p = np.array([0.1,0.1]) # actual endpoint position
+dp = np.zeros(2) # actual endpoint velocity
+ddp = np.zeros(2)
+phold = np.zeros(2)
+F = np.zeros(2) # endpoint force
+m = 0.5
+i = 0
+t = 0.0 # time
+
+dt = 0.01 # intergration step timedt = 0.01 # integration step time
+dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
+
 while run:
     #########Process events  (Mouse, Keyboard etc...)#########
     for event in pygame.event.get():
@@ -219,17 +249,20 @@ while run:
             if event.key == ord('m'):   ##Change the visibility of the mouse
                 pygame.mouse.set_visible(not pygame.mouse.get_visible())  
             if event.key == ord('q'):   ##Force to quit
-                run = False            
-            '''*********** Student can add more ***********'''
-            ##Rotate the needle and the hand of the haptic
-        
+                run = False          
 
+            ##Rotate the needle
+            if event.key ==ord('r'):
+                needle_rotation +=1
+            if event.key ==ord('e'):
+                needle_rotation -= 1
+
+            #visualisation of walls
             if event.key ==ord('o'):
                 visiualse_walls = True
             if event.key ==ord('p'):
                 visiualse_walls = False
 
-            '''*********** !Student can add more ***********'''
 
     ######### Read position (Haply and/or Mouse)  #########
     ##Get endpoint position xh
@@ -247,17 +280,24 @@ while run:
         xm = xh     ##Mouse position is not used
          
     else:
-        ##Compute distances and forces between blocks
-        xh = np.clip(np.array(haptic.center),0,599)
-        xh = np.round(xh)
-        
-        ##Get mouse position
-        cursor.center = pygame.mouse.get_pos()
-        xm = np.clip(np.array(cursor.center),0,599)
+        pass
+
+    '''Force calculation'''
+    F = np.zeros(2)  ##Environment force is set to 0 initially.
+
+    cursor = pygame.mouse.get_pos() 
+    pr = cursor # in the first case cursor pos is also reference pos (will change if we do this via udp)
+
+    # spring force calculation
+    Fs = K @ (pr-p) 
     
-    '''*********** Student should fill in ***********'''
-    # add dynamics of the environment
-    fe = np.zeros(2)  ##Environment force is set to 0 initially.
+    # damping force calculation
+    D = 2*0.7*np.sqrt(K)
+    Fd = D @ dp
+   
+    #endpoint force
+    F = Fs - Fd
+
 
     # #get wall position of needle
     # tip_needle = pygame.Rect(xh[0]+325,xh[1]+13,2,2)
@@ -282,34 +322,22 @@ while run:
         if Collision:
             print("Oh no! We touched:", value)
 
-
-
-
-
-    '''*********** !Student should fill in ***********'''
-    
-    ##Update old samples for velocity computation
-    xhold = xh
-    xmold = xm
-    
     ######### Send forces to the device #########
     if port:
-        fe[1] = -fe[1]  ##Flips the force on the Y=axis 
+        F[1] = -F[1]  ##Flips the force on the Y=axis 
 
         ##Update the forces of the device
-        device.set_device_torques(fe)
+        device.set_device_torques(F)
         device.device_write_torques()
         #pause for 1 millisecond
         time.sleep(0.001)
     else:
-        ######### Update the positions according to the forces ########
-        ##Compute simulation (here there is no inertia)
-        ##If the haply is connected xm=xh and dxh = 0
-        dxh = (k/b*(xm-xh)/window_scale -fe/b)    ####replace with the valid expression that takes all the forces into account
-        dxh = dxh*window_scale
-        xh = np.round(xh+dxh)             ##update new positon of the end effector
-        
-    haptic.center = xh 
+        ddp = F/m
+        dp += ddp*dt
+        p += dp*dt
+        t += dt
+    
+    i += 1
     
     ######### Graphical output #########
     ##Render the haptic surface
@@ -317,24 +345,23 @@ while run:
     
     ##Change color based on effort
     colorMaster = (255,\
-         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255),\
-         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
+         255-np.clip(np.linalg.norm(k*(pr-p)/window_scale)*15,0,255),\
+         255-np.clip(np.linalg.norm(k*(pr-p)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
 
-    pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
+    pygame.draw.rect(screenHaptics, colorMaster, (pr[0]-20,pr[1]-20,40,40),border_radius=4)
     
     
     ######### Robot visualization ###################
     # update individual link position
     if robotToggle:
-        robot.createPantograph(screenHaptics,xh)
+        robot.createPantograph(screenHaptics,pr)
         
     ### Hand visualisation
-    pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
+    #pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
     
     ##Render the VR surface
     screenVR.fill(cWhite)
 
-    '''*********** Student should fill in ***********'''
     ### Visualize all components of the simulation
 
     # Draw all the vertical tissue layers
@@ -359,7 +386,16 @@ while run:
 
     
     # Draw the masks  
-    pygame.draw.rect(screenVR, colorHaptic, haptic, border_radius=8) #draw the needle
+    pygame.draw.rect(screenVR, colorHaptic, (p[0],p[1],1,1), border_radius=8) #draw the needle
+
+    #define center of needle
+    pivot = [p[0]+175, p[1]+23]
+    offset = pygame.math.Vector2(0, 0)
+
+    rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
+
+    #screenVR.blit(spine,(400,0)) #draw the spine
+    screenVR.blit(rotated_image,rect) #draw the needle
     
     vert_pos_one   = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
     vert_pos_two   = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
@@ -372,7 +408,7 @@ while run:
     screenVR.blit(vertebrae_layer,(vert_pos_three[0],vert_pos_three[1]))
     screenVR.blit(vertebrae_layer,(vert_pos_four[0],vert_pos_four[1]))
     screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))
-    '''*********** !Student should fill in ***********'''
+
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
@@ -384,7 +420,7 @@ while run:
         text = font.render("FPS = " + str(round(clock.get_fps())) + \
                             "  xm = " + str(np.round(10*xm)/10) +\
                             "  xh = " + str(np.round(10*xh)/10) +\
-                            "  fe = " + str(np.round(10*fe)/10) \
+                            "  fe = " + str(np.round(10*F)/10) \
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
 
