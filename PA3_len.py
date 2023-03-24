@@ -84,7 +84,7 @@ b = .8       ##Viscous of the pseudohaptic display
 vertebrae_layer  = pygame.image.load("vertebra_test.png").convert_alpha()
 vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(140,140))
 needle           = pygame.image.load("surgical needle small.png").convert_alpha()
-needle           = pygame.transform.scale(needle,(400,40))
+needle           = pygame.transform.scale(needle,(400,16))
 needle_undeformed = needle.copy()
 
 # Create pixel masks for every object 
@@ -386,16 +386,24 @@ while run:
 
     
     # Draw the masks  
-    pygame.draw.rect(screenVR, colorHaptic, (p[0],p[1],1,1), border_radius=8) #draw the needle
+   
 
     #define center of needle
-    pivot = [p[0]+175, p[1]+23]
+    pivot = [p[0]+200, p[1]+8]
     offset = pygame.math.Vector2(0, 0)
 
     rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
 
+    #define size of needle 
+    r = 200
+    rad = needle_rotation * math.pi / 180
+
+  
+
+
     #screenVR.blit(spine,(400,0)) #draw the spine
     screenVR.blit(rotated_image,rect) #draw the needle
+    pygame.draw.rect(screenVR, colorHaptic, (p[0]+200+math.cos(rad)*r,p[1]+math.sin(rad)*r+8,8,8), border_radius=8) #draw the needle
     
     vert_pos_one   = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
     vert_pos_two   = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
