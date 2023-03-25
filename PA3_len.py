@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import pygame
 import numpy as np
 import math
@@ -13,7 +11,6 @@ import time
 
 def rotate(surface, angle, pivot, offset):
     """Rotate the surface around the pivot point.
-
     Args:
         surface (pygame.Surface): The surface that is to be rotated.
         angle (float): Rotate by this angle.
@@ -30,11 +27,11 @@ def rotate(surface, angle, pivot, offset):
 ##################### General Pygame Init #####################
 ##initialize pygame window
 pygame.init()
-window = pygame.display.set_mode((1200, 600))   ##twice 600x400 for haptic and VR
+window = pygame.display.set_mode((1200, 400))   ##twice 600x400 for haptic and VR
 pygame.display.set_caption('Virtual Haptic Device')
 
-screenHaptics = pygame.Surface((600,600))
-screenVR = pygame.Surface((600,600))
+screenHaptics = pygame.Surface((600,400))
+screenVR = pygame.Surface((600,400))
 
 ##add nice icon from https://www.flaticon.com/authors/vectors-market
 icon = pygame.image.load('robot.png')
@@ -54,7 +51,7 @@ xc,yc = screenVR.get_rect().center ##center of the screen
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
-FPS = 100   #in Hertz
+FPS = 200   #in Hertz
 
 ##define some colors
 cSkin      = (210,161,140)
@@ -95,7 +92,7 @@ needle_mask      = pygame.mask.from_surface(needle)
 # Get the rectangles and obstacle locations for rendering and mask offset
 vertebrae_rect   = vertebrae_mask.get_rect()
 
-haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(4, 4)
+haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(40,40)
 cursor  = pygame.Rect(0, 0, 5, 5)
 colorHaptic = cOrange ##color of the wall
 
@@ -222,8 +219,10 @@ flag = True
 center = np.array([xc,yc])    
 
 
-'''Intial variable declerations'''
-K = np.diag([1000,1000]) # stiffness matrix N/m
+######### DEFINE SIMULATION PARAMETERS ##########
+K_SKIN = 0.1 # stiffness matrix N/m
+D_SKIN = 5
+
 p = np.array([0.1,0.1]) # actual endpoint position
 dp = np.zeros(2) # actual endpoint velocity
 ddp = np.zeros(2)
@@ -280,33 +279,20 @@ while run:
         xm = xh     ##Mouse position is not used
          
     else:
-        pass
-
-    '''Force calculation'''
-    F = np.zeros(2)  ##Environment force is set to 0 initially.
-
-    cursor = pygame.mouse.get_pos() 
-    pr = cursor # in the first case cursor pos is also reference pos (will change if we do this via udp)
-
-    # spring force calculation
-    Fs = K @ (pr-p) 
+        ##Compute distances and forces between blocks
+        xh = np.clip(np.array(haptic.center),0,599)
+        xh = np.round(xh)
+        
+        ##Get mouse position
+        cursor = pygame.mouse.get_pos()
+        xm = np.clip(np.array(cursor),0,599)
     
-    # damping force calculation
-    D = 2*0.7*np.sqrt(K)
-    Fd = D @ dp
-   
-    #endpoint force
-    F = Fs - Fd
-
-
-
 
     ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
 
     # Define haptic center and endpoint of our haptic
-    haptic_center   = pygame.Rect(p[0],p[1],1,1)
-    haptic_endpoint = pygame.Rect(haptic_center[0]+np.cos(alpha)*150,haptic_center[1]+np.sin(alpha)*150, 1, 1)
-
+    haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*150,haptic.center[1]+np.sin(alpha)*150, 1, 1)
+    
     # Create endpoint masks for collision detection between endpoint and drawn vertebrae
     haptic_endpoint_mask = pygame.mask.Mask((haptic_endpoint.width, haptic_endpoint.height))
     haptic_endpoint_mask.fill()
@@ -319,7 +305,6 @@ while run:
     vert_rect5 = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
 
     # Compute offset between haptic endpoint and every vertebrae mask
-    # NOTE THIS MUST BE OPTIMIZED
     xoffset1 = vert_rect1[0] - haptic_endpoint[0]
     yoffset1 = vert_rect1[1] - haptic_endpoint[1]
     xoffset2 = vert_rect2[0] - haptic_endpoint[0]
@@ -339,60 +324,63 @@ while run:
     vert5_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset5, yoffset5))
     
     
-    if vert1_collision:
-        #print("Collision vert one")
-        vert_col = True
-    
-    elif vert2_collision:
-        #print("Collision vert two")
-        vert_col = True
-   
-    elif vert3_collision:
-        #print("Collision vert three")
-        vert_col = True
-        
-    elif vert4_collision:
-        #print("Collision vert four")
-        vert_col = True
-        
-    elif vert5_collision:
-        #print("Collision vert five")
-        vert_col = True
-        
-    else:
-        vert_col = False
+    ########## COMPUTE ENDPOINT FORCE FEEDBACK ##########
 
-    if vert_col and flag:
-        pold = np.copy(p)
-        flag = False
+    # Initialize zero endpoint force and reference position based on cursor or Haply
+    fe = np.zeros(2)
+    reference_pos  = cursor
+
+    # # Check if collision occurs in any of the drawn vertebrae
+    # if vert1_collision or vert2_collision or vert3_collision or vert4_collision or vert5_collision:
     
-    
+    #     # Flip vertebrae collison bool 
+    #     vert_col = True
+    #     elastic_wall_force = [-K_SKIN*(xh[0]-wall_layer1[0]),0]
+    #     fe += elastic_wall_force
+
+    # else:
+    #     vert_col = False
+    #     fe +=[0,0]
+
+    # if vert_col and flag:
+    #     pold = np.copy(p)
+    #     flag = False
+       
     # Loop over all the objects and check for collision
     for value in objects:
         Collision = haptic_endpoint.colliderect(objects[value])
         if Collision:
             pass
-            #print("Oh no! We touched:", value)
+
+    
+    handle_velocity = (xh-xhold)*(1/FPS)  
+    F_vdamper = -b*handle_velocity
+    
+    
+    # Add the damper force to the spring force
+    fe += F_vdamper 
+
+    xhold = xh
+    xmold = xm
+
+    ######## FORCE CALCULATIONS PER TISSUE LAYER #########
+
 
     ######### Send forces to the device #########
     if port:
-        F[1] = -F[1]  ##Flips the force on the Y=axis 
+        fe[1] = -fe[1]  ##Flips the force on the Y=axis 
 
         ##Update the forces of the device
-        device.set_device_torques(F)
+        device.set_device_torques(fe)
         device.device_write_torques()
         #pause for 1 millisecond
         time.sleep(0.001)
     else:
-        if vert_col and pold[0] < pr[0]:
-            F = 0
-            dp = np.zeros(2)
-        ddp = F/m
-        dp += ddp*dt
-        p += dp*dt
-        t += dt
-
-    i += 1
+        dxh = (k/b*(xm-xh)/window_scale -fe/b)    ####replace with the valid expression that takes all the forces into account
+        dxh = dxh*window_scale
+        xh = np.round(xh+dxh)             ##update new positon of the end effector
+        
+    haptic.center = xh 
     
     ######### Graphical output #########
     ##Render the haptic surface
@@ -400,16 +388,17 @@ while run:
     
     ##Change color based on effort
     colorMaster = (255,\
-         255-np.clip(np.linalg.norm(k*(pr-p)/window_scale)*15,0,255),\
-         255-np.clip(np.linalg.norm(k*(pr-p)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
-
-    pygame.draw.rect(screenHaptics, colorMaster, (pr[0]-20,pr[1]-20,40,40),border_radius=4)
-
+         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255),\
+         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
+    
+    pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
+    pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
+    
     
     ######### Robot visualization ###################
     # update individual link position
     if robotToggle:
-        robot.createPantograph(screenHaptics,pr)
+        robot.createPantograph(screenHaptics,xh)
         
     ##Render the VR surface
     screenVR.fill(cWhite)
@@ -451,34 +440,10 @@ while run:
 
 
     # Draw the needle
-    pygame.draw.line(screenVR, cOrange, (haptic_center[0],haptic_center[1]), (haptic_center[0]+np.cos(alpha)*150, haptic_center[1]+np.sin(alpha)*150), 2 )
-    pygame.draw.line(screenVR, cOrange, (haptic_center[0],haptic_center[1]), (haptic_center[0]+np.sin(-alpha)*25, haptic_center[1]+ np.cos(-alpha)*25), 2 )
-    pygame.draw.line(screenVR, cOrange, (haptic_center[0],haptic_center[1]), (haptic_center[0]-np.sin(-alpha)*25, haptic_center[1]- np.cos(-alpha)*25), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
     
-
-
-    # #define center of needle
-    # pivot = [p[0]+200, p[1]+8]
-    # offset = pygame.math.Vector2(0, 0)
-
-    # rotated_image, rect = rotate(needle_undeformed, needle_rotation, pivot, offset)
-
-    # #define size of needle 
-    # r = 200
-    # rad = needle_rotation * math.pi / 180
-
-
-    # # Needle center
-    # needle_center = rect.midright
-    # pygame.draw.circle(screenVR, colorHaptic, p, radius=40) #draw the needle
-
-
-    # screenVR.blit(rotated_image,rect) #draw the needle
-
-    # pygame.draw.rect(screenVR, colorHaptic, (p[0]+200+math.cos(rad)*r,p[1]+math.sin(rad)*r+8,8,8), border_radius=8) #draw the needle
-    
-
-
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
     window.blit(screenVR, (600,0))
@@ -501,4 +466,3 @@ while run:
 
 pygame.display.quit()
 pygame.quit()
-
