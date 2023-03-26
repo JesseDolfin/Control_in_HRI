@@ -72,8 +72,8 @@ wall_size_factor8 = 0.0      # VERTEBRAE
 
 
 ####Pseudo-haptics dynamic parameters, k/b needs to be <1
-k = .5      ##Stiffness between cursor and haptic display
-b = .8       ##Viscous of the pseudohaptic display
+K_TISSUE = .5      ##Stiffness between cursor and haptic display
+D_TISSUE = .8       ##Viscous of the pseudohaptic display
 
 
 ##################### Define sprites #####################
@@ -145,11 +145,18 @@ wall_layer15 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer14[1] + wall_
 wall_layer16 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer15[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 
 # # Store all objects in dictonary
-objects = {'Skin': wall_layer1, 'Fat': wall_layer2, 'Supraspinal ligament one': wall_layer3, 'Interspinal ligament': wall_layer4,
-           'Ligamentum flavum': wall_layer5, 'Cerebrospinal fluid one': wall_layer6, 'Spinal cord': wall_layer7,
-            'Cerebrospinal fluid two': wall_layer8, 'Supraspinal ligament two':  wall_layer9, 'Cartilage': wall_layer10,
-              'Supraspinal ligament three': wall_layer11, 'Vertebrae one': wall_layer12, 'Vertebrae two': wall_layer13,
-              'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16}
+objects_dict = {'Skin': wall_layer1, 'Fat': wall_layer2, 'Supraspinal ligament one': wall_layer3, 'Interspinal ligament': wall_layer4,
+                'Ligamentum flavum': wall_layer5, 'Cerebrospinal fluid one': wall_layer6, 'Spinal cord': wall_layer7,
+                'Cerebrospinal fluid two': wall_layer8, 'Supraspinal ligament two':  wall_layer9, 'Cartilage': wall_layer10,
+                'Supraspinal ligament three': wall_layer11, 'Vertebrae one': wall_layer12, 'Vertebrae two': wall_layer13,
+                'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16}
+
+collision_dict = {'Skin': False, 'Fat': False, 'Supraspinal ligament one': False, 'Interspinal ligament': False,
+                'Ligamentum flavum': False, 'Cerebrospinal fluid one': False, 'Spinal cord': False,
+                'Cerebrospinal fluid two': False, 'Supraspinal ligament two':  False, 'Cartilage': False,
+                'Supraspinal ligament three': False, 'Vertebrae one': False, 'Vertebrae two': False,
+                'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False}
+
 
 
 ##################### Detect and Connect Physical device #####################
@@ -212,7 +219,7 @@ run = True
 ongoingCollision = False
 fieldToggle = True
 robotToggle = True
-debugToggle = False
+debugToggle = True
 vert_col = False
 flag = True
 
@@ -221,17 +228,8 @@ center = np.array([xc,yc])
 
 ######### DEFINE SIMULATION PARAMETERS ##########
 K_SKIN = 0.1 # stiffness matrix N/m
-D_SKIN = 5
+D_TISSUE = 0.5
 
-p = np.array([0.1,0.1]) # actual endpoint position
-dp = np.zeros(2) # actual endpoint velocity
-ddp = np.zeros(2)
-phold = np.zeros(2)
-pold = np.zeros(2)
-F = np.zeros(2) # endpoint force
-m = 0.5
-i = 0
-t = 0.0 # time
 
 dt = 0.01 # intergration step timedt = 0.01 # integration step time
 dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
@@ -329,32 +327,64 @@ while run:
     # Initialize zero endpoint force and reference position based on cursor or Haply
     fe = np.zeros(2)
     reference_pos  = cursor
-
-    # # Check if collision occurs in any of the drawn vertebrae
-    # if vert1_collision or vert2_collision or vert3_collision or vert4_collision or vert5_collision:
-    
-    #     # Flip vertebrae collison bool 
-    #     vert_col = True
-    #     elastic_wall_force = [-K_SKIN*(xh[0]-wall_layer1[0]),0]
-    #     fe += elastic_wall_force
-
-    # else:
-    #     vert_col = False
-    #     fe +=[0,0]
-
-    # if vert_col and flag:
-    #     pold = np.copy(p)
-    #     flag = False
        
+    # Update the collision dict to all False to reset collision dict 
+    collision_dict.update((value, False) for value in collision_dict)
+    
     # Loop over all the objects and check for collision
-    for value in objects:
-        Collision = haptic_endpoint.colliderect(objects[value])
+    for value in objects_dict:
+        Collision = haptic_endpoint.colliderect(objects_dict[value])
+
+        # If collision is detected in specific layer only update this value to True
         if Collision:
-            pass
+            collision_dict.update({value: True})
+
+    # Check which values in collision dict are True and update endpoint force and damping factor accordingly to simulate different tissues
+    # Note that these values are random currently and the endpoint force probably needs to be updated differently or more elegantly.
+    # Also note that currently the vertebrae are simulated with high damping. But this needs to be adjusted to an infinitely stiff wall
+    # the drawn vertebrae are not yet included 
+    if collision_dict['Skin']:
+        D_TISSUE = 6.1
+        fe[0] += 6
+    elif collision_dict['Fat']:
+        D_TISSUE = 2.1
+        fe[0] += 2
+    elif collision_dict['Supraspinal ligament one']:
+        D_TISSUE = 4.5
+        fe[0] += 4.4
+    elif collision_dict['Interspinal ligament']:
+        D_TISSUE = 8
+    elif collision_dict['Ligamentum flavum']:
+        D_TISSUE = 10
+    elif collision_dict['Cerebrospinal fluid one']:
+        D_TISSUE = 12
+    elif collision_dict['Spinal cord']:
+        D_TISSUE = 14
+    elif collision_dict['Cerebrospinal fluid two']:
+        D_TISSUE = 16
+    elif collision_dict['Supraspinal ligament two']:
+        D_TISSUE = 18
+    elif collision_dict['Cartilage']:
+        D_TISSUE = 25
+    elif collision_dict['Supraspinal ligament three']:
+        D_TISSUE = 30
+    elif collision_dict['Vertebrae one']:
+        D_TISSUE = 50
+    elif collision_dict['Vertebrae two']:
+        D_TISSUE = 50
+    elif collision_dict['Vertebrae three']:
+        D_TISSUE = 50
+    elif collision_dict['Vertebrae four']:
+        D_TISSUE = 50
+    elif collision_dict['Vertebrae five']:
+        D_TISSUE = 50
+    else:
+        D_TISSUE = 1
+            
 
     
     handle_velocity = (xh-xhold)*(1/FPS)  
-    F_vdamper = -b*handle_velocity
+    F_vdamper = -D_TISSUE*handle_velocity
     
     
     # Add the damper force to the spring force
@@ -376,7 +406,7 @@ while run:
         #pause for 1 millisecond
         time.sleep(0.001)
     else:
-        dxh = (k/b*(xm-xh)/window_scale -fe/b)    ####replace with the valid expression that takes all the forces into account
+        dxh = (K_TISSUE/D_TISSUE*(xm-xh)/window_scale -fe/D_TISSUE)    ####replace with the valid expression that takes all the forces into account
         dxh = dxh*window_scale
         xh = np.round(xh+dxh)             ##update new positon of the end effector
         
@@ -388,10 +418,10 @@ while run:
     
     ##Change color based on effort
     colorMaster = (255,\
-         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255),\
-         255-np.clip(np.linalg.norm(k*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
+         255-np.clip(np.linalg.norm(K_TISSUE*(xm-xh)/window_scale)*15,0,255),\
+         255-np.clip(np.linalg.norm(K_TISSUE*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
     
-    pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*k*(xm-xh)))
+    pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*K_TISSUE*(xm-xh)))
     pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
     
     
@@ -454,7 +484,7 @@ while run:
         text = font.render("FPS = " + str(round(clock.get_fps())) + \
                             "  xm = " + str(np.round(10*xm)/10) +\
                             "  xh = " + str(np.round(10*xh)/10) +\
-                            "  fe = " + str(np.round(10*F)/10) \
+                            "  fe = " + str(np.round(10*fe)/10) \
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
 
