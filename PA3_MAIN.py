@@ -10,6 +10,8 @@ from serial.tools import list_ports
 import time
 
 ##################### General Pygame Init #####################
+
+
 ##initialize pygame window
 pygame.init()
 window = pygame.display.set_mode((1200, 400))   ##twice 600x400 for haptic and VR
@@ -38,7 +40,7 @@ xc,yc = screenVR.get_rect().center ##center of the screen
 clock = pygame.time.Clock()
 FPS = 200   #in Hertz
 
-##define some colors
+## Define colors to be used to render different tissue layers and haptic
 cSkin      = (210,161,140)
 cFat       = (255,174,66)
 cLig_one   = (232,229,221)
@@ -50,11 +52,6 @@ cVerte     = (226,195,152)
 
 cOrange = (255,100,0)
 cWhite  = (255,255,255)
-
-# CEREBROSPINAL FLUID
-wall_size_factor7 = 0.15     # SPINAL CORD
-wall_size_factor8 = 0.0      # VERTEBRAE
-
 
 ####Pseudo-haptics dynamic parameters, k/b needs to be <1
 K_TISSUE = .5      ##Stiffness between cursor and haptic display
@@ -96,6 +93,25 @@ skin_penetrated = False
 fat_penetrated  = False
 
 
+# Set all environment parameters to simulate damping in the various tissue layers
+D_TISSUE_SKIN   = 5
+D_TISSUE_FAT    = 10
+D_TISSUE_SUPRA  = 15
+D_TISSUE_INTER  = 20
+D_TISSUE_FLAVUM = 20
+D_TISSUE_FLUID  = 10
+D_TISSUE_CORD   = 5
+D_TISSUE_CART   = 30
+
+#  Set all environment parameters to simulate damping in the various tissue layers
+MAX_TISSUE_SKIN     = 1
+MAX_TISSUE_FAT      = 2 
+MAX_TISSUE_SUPRA    = 3
+MAX_TISSUE_INTER    = 2
+MAX_TISSUE_FLAVUM   = 5
+MAX_TISSUE_FLUID    = 1
+MAX_TISSUE_CORD     = 1
+MAX_TISSUE_CART     = 5
 
 # Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
 simulation_space  = [[300, 600, 300], [0, 600, 600]]
@@ -125,39 +141,39 @@ wall_layer9  = pygame.Rect(wall_layer8[0]+wall_layer8[2],simulation_space[1][0],
 wall_layer10 = pygame.Rect(wall_layer9[0]+wall_layer9[2],simulation_space[1][0],wall_size_factor9*(simulation_space[0][2]),simulation_space[1][2])
 wall_layer11 = pygame.Rect(wall_layer10[0]+wall_layer10[2],simulation_space[1][0],wall_size_factor3*(simulation_space[0][2]),simulation_space[1][2])
 
-# Vertebrae 
+# Vertebrae layers modelled as rectangles
 wall_layer12 = pygame.Rect(wall_layer9[0]+wall_layer9[2],simulation_space[1][0],wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 wall_layer13 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 wall_layer14 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer13[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 wall_layer15 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer14[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 wall_layer16 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer15[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 
-# Store all objects in dictonary
+# Store all objects in a dict which can be accessed for collision detection
 objects_dict = {'Skin': wall_layer1, 'Fat': wall_layer2, 'Supraspinal ligament one': wall_layer3, 'Interspinal ligament': wall_layer4,
                 'Ligamentum flavum': wall_layer5, 'Cerebrospinal fluid one': wall_layer6, 'Spinal cord': wall_layer7,
                 'Cerebrospinal fluid two': wall_layer8, 'Supraspinal ligament two':  wall_layer9, 'Cartilage': wall_layer10,
                 'Supraspinal ligament three': wall_layer11, 'Vertebrae one': wall_layer12, 'Vertebrae two': wall_layer13,
                 'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16}
 
-# Create a boolean collision dictonary
+# Initialize a collision dictionary to store booleans corresponding to all objects that are in collision
 collision_dict = {'Skin': False, 'Fat': False, 'Supraspinal ligament one': False, 'Interspinal ligament': False,
-                'Ligamentum flavum': False, 'Cerebrospinal fluid one': False, 'Spinal cord': False,
-                'Cerebrospinal fluid two': False, 'Supraspinal ligament two':  False, 'Cartilage': False,
-                'Supraspinal ligament three': False, 'Vertebrae one': False, 'Vertebrae two': False,
-                'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False}
+                    'Ligamentum flavum': False, 'Cerebrospinal fluid one': False, 'Spinal cord': False,
+                    'Cerebrospinal fluid two': False, 'Supraspinal ligament two':  False, 'Cartilage': False,
+                    'Supraspinal ligament three': False, 'Vertebrae one': False, 'Vertebrae two': False,
+                    'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False}
 
-# Create a dictonary which holds all the simulation variables for efficiency
-variable_dict = {'Skin': {'D_TISSUE': 5, 'collision_bool': True, 'update_bool': True,},
-                    'Fat' : {'D_TISSUE': 10, 'collision_bool': True, 'update_bool': True},
-                    'Supraspinal ligament one': {'D_TISSUE': 15, 'collision_bool': True, 'update_bool': True},
-                    'Interspinal ligament': {'D_TISSUE': 20, 'collision_bool': True, 'update_bool': True},
-                    'Ligamentum flavum': {'D_TISSUE': 20, 'collision_bool': True, 'update_bool': True},
-                    'Cerebrospinal fluid one': {'D_TISSUE': 10, 'collision_bool': True, 'update_bool': True},
-                    'Spinal cord': {'D_TISSUE': 5, 'collision_bool': True, 'update_bool': True},
-                    'Cerebrospinal fluid two': {'D_TISSUE': 10, 'collision_bool': True, 'update_bool': True},
-                    'Supraspinal ligament two': {'D_TISSUE': 15, 'collision_bool': True, 'update_bool': True},
-                    'Cartilage': {'D_TISSUE': 30, 'collision_bool': True, 'update_bool': True},
-                    'Supraspinal ligament three': {'D_TISSUE': 15, 'collision_bool': True, 'update_bool': True}}
+# Initialize a dictonary which holds all the simulation parameters for efficiency
+variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TISSUE_SKIN, 'collision_bool': True, 'update_bool': True,},
+                    'Fat' : {'D_TISSUE': D_TISSUE_FAT,'max_tissue_force': MAX_TISSUE_FAT, 'collision_bool': True, 'update_bool': True},
+                    'Supraspinal ligament one': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True},
+                    'Interspinal ligament': {'D_TISSUE': D_TISSUE_INTER,'max_tissue_force': MAX_TISSUE_INTER, 'collision_bool': True, 'update_bool': True},
+                    'Ligamentum flavum': {'D_TISSUE': D_TISSUE_FLAVUM,'max_tissue_force': MAX_TISSUE_FLAVUM, 'collision_bool': True, 'update_bool': True},
+                    'Cerebrospinal fluid one': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID, 'collision_bool': True, 'update_bool': True},
+                    'Spinal cord': {'D_TISSUE': D_TISSUE_CORD,'max_tissue_force': MAX_TISSUE_CORD, 'collision_bool': True, 'update_bool': True},
+                    'Cerebrospinal fluid two': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID , 'collision_bool': True, 'update_bool': True},
+                    'Supraspinal ligament two': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True},
+                    'Cartilage': {'D_TISSUE': D_TISSUE_CART,'max_tissue_force': MAX_TISSUE_CART, 'collision_bool': True, 'update_bool': True},
+                    'Supraspinal ligament three': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True}}
 
 
 
@@ -219,6 +235,8 @@ window_scale = 3
 ##TODO - Perhaps it needs to be changed by a timer for real-time see: 
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
+
+# Declare some simulation booleans to switch between states
 run = True
 ongoingCollision = False
 fieldToggle = True
@@ -236,21 +254,9 @@ still_penetrated = False
 dt = 0.01 # intergration step timedt = 0.01 # integration step time
 dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
 i = 0
-update        = True
-update_fat    = True
-update_supra  = True
-update_inter  = True
-update_flavum = True
-update_fluid  = True
-update_cord   = True
-update_fluid2 = True
-update_supra2 = True
-update_cart   = True
-update_supra3 = True
 
-update_bool   = True
+
 damping = 0
-
 while run:
     penetration = True
     collision_bone = False
@@ -308,10 +314,10 @@ while run:
 
     ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
 
-    # Define haptic center and endpoint of our haptic
+    # Define haptic center and endpoint of our haptic (needle tip)
     haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*150,haptic.center[1]+np.sin(alpha)*150, 1, 1)
     
-    # Create endpoint masks for collision detection between endpoint and drawn vertebrae
+    # Create endpoint masks for collision detection between endpoint and drawn vertebrae (odd shape so cannot be rendered using rectangles)
     haptic_endpoint_mask = pygame.mask.Mask((haptic_endpoint.width, haptic_endpoint.height))
     haptic_endpoint_mask.fill()
 
@@ -341,7 +347,7 @@ while run:
     vert4_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset4, yoffset4))
     vert5_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset5, yoffset5))
     
-    
+    # Check if any of the drawn vertebrae are in collision with the needle tip, if so flip boolean to limit needle movement later in pipeline
     if vert1_collision or vert2_collision or vert3_collision or vert4_collision or vert5_collision:
         collision_bone = True
 
@@ -369,7 +375,7 @@ while run:
     # ~ Pre-puncture:  R_F = S_f 
     # ~ Post-puncture: R_F = C_f + F_f
     
-    # Initialize general stiffness factor
+    # Initialize general stiffness factor of our system
     K = 1000
     
     # Compute endpoint velocity and update previous haptic state
@@ -378,45 +384,24 @@ while run:
     xhold = xh
     xmold = xm
 
-    # Initialize collision booleans
-    collision_skin   = False
-    collision_fat    = False
-    collision_supra  = False
-    collision_inter  = False
-    collision_flavum = False
-    collision_fluid  = False
-    collision_cord   = False
-    collision_fluid2 = False
-    collision_supra2 = False
-    collision_cart   = False
-    collision_supra3 = False
-
-    # Loop over all the objects and check for collision
+    # Loop over all the rectangular objects and check for collision, note that we exclude the vertebrae from the loop
+    # The reason being that these are modelled infinitely stiff so they don't need damping etc.
     Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five'}
     for collision in collision_dict:
         if collision not in Bones and collision_dict[collision] == True:
-
+            
+            # For the objects(tissues) in collision with the needle tip set the damping value of the environment accordingly
+            # Additionally, flip positional and collision boolean
             damping        = variable_dict[collision]['D_TISSUE']*K
             collision_bool = variable_dict[collision]['collision_bool']
             update_bool    = variable_dict[collision]['update_bool']
-            
+    
+    # In case no collisions are detected default the damping value of the environment to zero
     if all(value == False for value in collision_dict.values()):
         damping = 0
     
-    # Now we check all rectangular vertebrae collisions as we have overlapping rectangles the elif statement will skip these otherwise
-    if collision_dict['Vertebrae one']:
-        collision_bone = True
-
-    elif collision_dict['Vertebrae two']:
-        collision_bone = True
-
-    elif collision_dict['Vertebrae three']:
-        collision_bone = True
-
-    elif collision_dict['Vertebrae four']:
-        collision_bone = True
-
-    elif collision_dict['Vertebrae five']:
+    # Check if any of the rectangular vertebrae are in collision, if so flip bone collision boolean to limit needle movement
+    if collision_dict['Vertebrae one'] or collision_dict['Vertebrae two'] or collision_dict['Vertebrae three'] or collision_dict['Vertebrae four'] or collision_dict['Vertebrae five']:
         collision_bone = True
     else:
         pass
@@ -450,20 +435,25 @@ while run:
             dxh = np.zeros(2)
         else: 
             away_from_bone =  True
-    
+
+        # Loop over the detected collisions dictonary (excluding vertebrae), in case collision is detected retrieve tissue parameters from parameter dict
         Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five'}
         for collision in collision_dict:
             if collision not in Bones and collision_dict[collision] == True:
                 
+                # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
+                max_tissue_force = variable_dict[collision]['max_tissue_force']
+                print("Max tissue force: ", max_tissue_force)
+
+                # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
                 if collision_bool and update_bool and i>120:
                     phold = xh
                     variable_dict[collision]['update_bool'] = False
 
                 # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
-                
                 F_pen = (reference_pos[0]-phold[0])*0.1
                 
-                if F_pen > 5 and collision_bool and i > 120:
+                if F_pen > max_tissue_force and collision_bool and i > 120:
                     penetrated = True
                 else:
                     penetrated = False
@@ -477,6 +467,7 @@ while run:
         xh = dxh*dt + xh
         i+=1
     haptic.center = xh 
+    
     
     ######### Graphical output #########
     ##Render the haptic surface
