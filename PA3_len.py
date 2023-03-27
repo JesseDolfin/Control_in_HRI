@@ -79,11 +79,12 @@ vertebrae_rect   = vertebrae_mask.get_rect()
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(40,40)
 cursor  = pygame.Rect(0, 0, 5, 5)
 colorHaptic = cOrange ##color of the wall
+dxh = np.zeros(2)
 
-xh = np.array(haptic.center)
+xh = np.array(haptic.center,dtype='int32')
 
 ##Set the old value to 0 to avoid jumps at init
-xhold = 0
+xhold = np.zeros(2)
 xmold = 0
 
 ##################### Init Virtual env. #####################
@@ -133,7 +134,7 @@ wall_layer16 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer15[1] + wall_
 objects_dict = {'Skin': wall_layer1, 'Fat': wall_layer2, 'Supraspinal ligament one': wall_layer3, 'Interspinal ligament': wall_layer4,
                 'Ligamentum flavum': wall_layer5, 'Cerebrospinal fluid one': wall_layer6, 'Spinal cord': wall_layer7,
                 'Cerebrospinal fluid two': wall_layer8, 'Supraspinal ligament two':  wall_layer9, 'Cartilage': wall_layer10,
-                'Supraspinal ligament three': wall_layer11, 'Vertebrae one': wall_layer12, 'Vertebrae two': wall_layer13,
+                'Supraspinal ligament three': wall_layer11, 'Vertebrae': wall_layer12, 'Vertebrae two': wall_layer13,
                 'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16}
 
 collision_dict = {'Skin': False, 'Fat': False, 'Supraspinal ligament one': False, 'Interspinal ligament': False,
@@ -171,6 +172,8 @@ device = Device
 SimpleActuatorMech = Mechanisms
 pantograph = Pantograph
 robot = PShape
+reset = True
+
 
 #########Open the connection with the arduino board#########
 port = serial_ports()   ##port contains the communication port or False if no device
@@ -207,14 +210,22 @@ robotToggle = True
 debugToggle = True
 vert_col = False
 flag = True
-
+away_from_bone = True
 center = np.array([xc,yc])    
-
+allow_movement = True
+phold = np.zeros(2)
+penetrated = False
 
 dt = 0.01 # intergration step timedt = 0.01 # integration step time
 dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
+i = 0
+update = True
+update_fat = True
 
 while run:
+    penetration = True
+    collision_bone = False
+    collision_any = False
     #########Process events  (Mouse, Keyboard etc...)#########
     for event in pygame.event.get():
         ##If the window is close then quit 
@@ -302,6 +313,9 @@ while run:
     vert5_collision = haptic_endpoint_mask.overlap(vertebrae_mask, (xoffset5, yoffset5))
     
     
+    if vert1_collision or vert2_collision or vert3_collision or vert4_collision or vert5_collision:
+        collision_bone = True
+
     ########## COMPUTE ENDPOINT FORCE FEEDBACK ##########
 
     # Initialize zero endpoint force and reference position based on cursor or Haply
@@ -310,14 +324,19 @@ while run:
        
     # Update the collision dict to all False to reset collision dict 
     collision_dict.update((value, False) for value in collision_dict)
-    
+    collision_flag = False
     # Loop over all the objects and check for collision
     for value in objects_dict:
         Collision = haptic_endpoint.colliderect(objects_dict[value])
 
         # If collision is detected in specific layer only update this value to True
         if Collision:
+            collision_any = True
             collision_dict.update({value: True})
+ 
+
+    
+
 
     # Check which values in collision dict are True and update endpoint force and damping factor accordingly to simulate different tissues
     # Based on SOURCE we will implement a multilayer force displacement model as follows:
@@ -326,66 +345,72 @@ while run:
     
     # Setup penetration booleans for rendering and breaking out of elastic feedback force state
     # Setup outside of main loop
-    if collision_dict['Skin']:
-
-        # Setup the point of contact to model the applied force by the haptic
-        point_of_contact = np.array([wall_layer1[0], xh[1]])
-        positional_delta = np.array([(xh[0]+150) - point_of_contact[0],0])
+    # if collision_dict['Skin']:
+    #     collision_flag = True
+    #     # Setup the point of contact to model the applied force by the haptic
+    #     point_of_contact = np.array([wall_layer1[0], xh[1]])
+    #     positional_delta = np.array([(xh[0]+150) - point_of_contact[0],0])
        
-        # Resultant force in elastic state (pre-puncture)
-        resultant_force = .5*positional_delta[0] # 0.024 + 0.012*positional_delta[0] -0.005*positional_delta[0]**2+0.003*positional_delta[0]**3
+    #     # Resultant force in elastic state (pre-puncture)
+    #     resultant_force = .05*positional_delta[0] # 0.024 + 0.012*positional_delta[0] -0.005*positional_delta[0]**2+0.003*positional_delta[0]**3
         
-        tissue_elastic_force = 6.037
-        if np.abs(resultant_force) <= tissue_elastic_force and not skin_penetrated:
-            
-            fe[0] += resultant_force
+    #     tissue_elastic_force = 6
+    #     if np.abs(resultant_force) <= tissue_elastic_force and not skin_penetrated:
+    #         fe[0] += resultant_force
 
-        elif np.abs(resultant_force) > tissue_elastic_force:
-            skin_penetrated = True
+    #     elif np.abs(resultant_force) > tissue_elastic_force:
+    #         skin_penetrated = True
+    #         penetration = True
 
-            delta_pos = np.array([(xh[0]+150) - point_of_contact[0],0])
-            delta_pos_prev = np.array([(xhold[0]+150) - point_of_contact[0],0])
-            delta_vel_tangent = (delta_pos-delta_pos_prev)/FPS
+    #         delta_pos = np.array([(xh[0]+150) - point_of_contact[0],0])
+    #         delta_pos_prev = np.array([(xhold[0]+150) - point_of_contact[0],0])
+    #         delta_vel_tangent = (delta_pos-delta_pos_prev)/FPS
             
-            # Compute the frictional force acting on the the haptic device and the maximum frictional force before slip occurs
-            F_friction = 1.5*delta_vel_tangent[0]
+    #         # Compute the frictional force acting on the the haptic device and the maximum frictional force before slip occurs
+    #         F_friction = 0.05*delta_vel_tangent[0]
             
-            resultant_force = tissue_elastic_force + F_friction 
+    #         resultant_force = tissue_elastic_force + F_friction 
 
-            fe[0] += resultant_force  # NEED TO ADD FRICTIONAL FORCE
+    #         fe[0] += resultant_force  # NEED TO ADD FRICTIONAL FORCE
             
-    elif collision_dict['Fat']:
+    # elif collision_dict['Fat']:
         
-        # Setup the point of contact to model the applied force by the haptic
-        point_of_contact = np.array([wall_layer2[0], xh[1]])
-        positional_delta = np.array([(xh[0]+150) - point_of_contact[0],0])
+    #     # Setup the point of contact to model the applied force by the haptic
+    #     point_of_contact = np.array([wall_layer2[0], xh[1]])
+    #     positional_delta = np.array([(xh[0]+150) - point_of_contact[0],0])
 
-        # Resultant force in elastic state (pre-puncture)
-        resultant_force =  .5*positional_delta[0]   #1.974 + 0.829*positional_delta[0] -0.108*positional_delta[0]**2+0.0*positional_delta[0]**3
+    #     # Resultant force in elastic state (pre-puncture)
+    #     resultant_force =  .5*positional_delta[0]   #1.974 + 0.829*positional_delta[0] -0.108*positional_delta[0]**2+0.0*positional_delta[0]**3
 
-        tissue_elastic_force = 8.354
-        if np.abs(resultant_force) <= tissue_elastic_force and not fat_penetrated:
+    #     tissue_elastic_force = 1
+    #     if np.abs(resultant_force) <= tissue_elastic_force and not fat_penetrated:
             
-            fe[0] += resultant_force
+    #         fe[0] += resultant_force
+    #         reset = True
             
-        # Setup endpoint force feedback in case skin is penetrated (post-puncture)
-        elif np.abs(resultant_force) > tissue_elastic_force:
-            delta_pos = np.array([(xh[0]+150) - point_of_contact[0],0])
-            delta_pos_prev = np.array([(xhold[0]+150) - point_of_contact[0],0])
-            delta_vel_tangent = (delta_pos-delta_pos_prev)/FPS
+    #     # Setup endpoint force feedback in case skin is penetrated (post-puncture)
+    #     elif np.abs(resultant_force) > tissue_elastic_force:
+    #         if reset:
+    #             fe[0] = 0
+    #             reset = False
+    #         delta_pos = np.array([(xh[0]+150) - point_of_contact[0],0])
+    #         delta_pos_prev = np.array([(xhold[0]+150) - point_of_contact[0],0])
+    #         delta_vel_tangent = (delta_pos-delta_pos_prev)/FPS
             
-            # Compute the frictional force acting on the the haptic device and the maximum frictional force before slip occurs
-            F_friction = 1.5*delta_vel_tangent[0]
+    #         # Compute the frictional force acting on the the haptic device and the maximum frictional force before slip occurs
+    #         F_friction = 1.5*delta_vel_tangent[0]
         
-            fat_penetrated = True
-            
-            resultant_force =  tissue_elastic_force + F_friction 
+    #         fat_penetrated = True
+    #         penetration = True
 
-            fe[0] += resultant_force  # NEED TO ADD FRICTIONAL FORCE
+    #         resultant_force =  tissue_elastic_force + F_friction 
+   
+
+    #         fe[0] += resultant_force  # NEED TO ADD FRICTIONAL FORCE
             
-    else:
-        skin_penetrated = False
-        fat_penetrated = False
+    # else:
+    #     skin_penetrated = False
+    #     fat_penetrated = False
         
     
     
@@ -424,12 +449,39 @@ while run:
     #     D_TISSUE = 50
     # else:
     #     D_TISSUE = 1
-            
+    
+
+    '''Damping force per layer'''
+    K =1000
+    #calculate velocity
+    v = (xhold - xh)/FPS
     xhold = xh
     xmold = xm
 
-    ######## FORCE CALCULATIONS PER TISSUE LAYER #########
 
+
+    collision_skin = False
+    collision_fat = False
+    #set D_TISSUE per layer
+    if collision_dict['Skin']:
+        damping = 10*K
+        collision_skin = True
+    elif collision_dict['Fat']:
+        damping = 20*K
+        collision_fat = True
+    else:
+        damping = 0
+    
+    if not collision_skin:
+        update = True
+
+    if  not collision_skin and not collision_fat:
+        
+        update_fat = True
+       
+    #set force on needle
+    fd = -D_TISSUE * v *damping
+    fe = K* (xm-xh) - 2*0.7*np.sqrt(K)*dxh
 
     ######### Send forces to the device #########
     if port:
@@ -440,11 +492,66 @@ while run:
         device.device_write_torques()
         #pause for 1 millisecond
         time.sleep(0.001)
-    else:
-        dxh = (K_TISSUE/D_TISSUE*(xm-xh)/window_scale -fe/D_TISSUE)    ####replace with the valid expression that takes all the forces into account
-        dxh = dxh*window_scale
-        xh = np.round(xh+dxh)             ##update new positon of the end effector
+
+    else: 
+        ddxh = fe
+
+        #update velocity to accomodate damping
+        dxh += ddxh*dt -fd
+
+        # simulate collision with a infinitly stiff bone
+        if collision_bone and away_from_bone:
+            phold = xh
+            away_from_bone = False
+        if reference_pos[0] >= phold[0] and not away_from_bone:
+            dxh = np.zeros(2)
+        else: 
+            away_from_bone =  True
+
+        # simulate collision with skin
+        if collision_skin and update and i>120:
+            phold = xh
+            update = False
         
+    
+        F_pen = (reference_pos[0]- phold[0])*0.1  
+
+        if F_pen > 1 and collision_skin:
+            penetrated = True
+        else:
+            penetrated = False
+
+        if not penetrated and collision_skin and dxh[0] > 0:
+            dxh = np.zeros(2)
+
+        # simulate collision with fat
+        #this part is here to only update phold, it should only be updated at the beginning of each collision
+        if collision_fat and update_fat and i>120:
+            phold = xh
+            update_fat = False
+        
+        #calculated the force that the person is applying to haptic
+        F_pen = (reference_pos[0]- phold[0])*0.1  
+
+        #if this force is higher than threshold we have penetrated
+        if F_pen > 3 and collision_fat:
+            penetrated = True
+        else:
+            penetrated = False
+            print(F_pen)
+
+        #if we have not penetrated set velocity to 0
+        if not penetrated and dxh[0] > 0 and collision_fat:
+            dxh = np.zeros(2)
+
+
+      
+
+        #dxh = (K_TISSUE/D_TISSUE*(xm-xh)/window_scale -fe/D_TISSUE)  ####replace with the valid expression that takes all the forces into account
+        #dxh = dxh*window_scale
+        #xh = np.round(xh+dxh)             ##update new positon of the end effector
+        xh = dxh*dt + xh
+        i+=1
     haptic.center = xh 
     
     ######### Graphical output #########
@@ -497,37 +604,6 @@ while run:
     vert_pos_four  = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
     vert_pos_five  = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
 
-
-    # Draw needle position based on layer penetration
-    if collision_dict['Skin']:
-        if not skin_penetrated:
-            pygame.draw.line(screenVR, cOrange, (point_of_contact[0]-150, haptic.center[1]), (point_of_contact[0]-150+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
-            pygame.draw.line(screenVR, cOrange, (point_of_contact[0]-150, haptic.center[1]), (point_of_contact[0]-150+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
-            pygame.draw.line(screenVR, cOrange, (point_of_contact[0]-150, haptic.center[1]), (point_of_contact[0]-150-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
-        
-        elif skin_penetrated:
-            
-            pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
-            pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
-            pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )   
-    elif collision_dict['Fat']:
-        
-        if not fat_penetrated:
-            pygame.draw.line(screenVR, cOrange, (point_of_contact[0]-150, haptic.center[1]), (point_of_contact[0]-150+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
-            pygame.draw.line(screenVR, cOrange, (point_of_contact[0]-150, haptic.center[1]), (point_of_contact[0]-150+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
-            pygame.draw.line(screenVR, cOrange, (point_of_contact[0]-150, haptic.center[1]), (point_of_contact[0]-150-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
-        
-        elif fat_penetrated:
-            
-            pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
-            pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
-            pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )    
-    else:
-        pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
-        pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
-        pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
-    print(haptic.center[0])    
-    
     # Draw all the vertebrae
     screenVR.blit(vertebrae_layer,(vert_pos_one[0],vert_pos_one[1])) 
     screenVR.blit(vertebrae_layer,(vert_pos_two[0],vert_pos_two[1]))
@@ -535,6 +611,12 @@ while run:
     screenVR.blit(vertebrae_layer,(vert_pos_four[0],vert_pos_four[1]))
     screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))  
 
+
+
+    # Draw needle 
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*150, haptic.center[1]+np.sin(alpha)*150), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
