@@ -163,17 +163,17 @@ collision_dict = {'Skin': False, 'Fat': False, 'Supraspinal ligament one': False
                     'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False}
 
 # Initialize a dictonary which holds all the simulation parameters for efficiency
-variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TISSUE_SKIN, 'collision_bool': True, 'update_bool': True,},
-                    'Fat' : {'D_TISSUE': D_TISSUE_FAT,'max_tissue_force': MAX_TISSUE_FAT, 'collision_bool': True, 'update_bool': True},
-                    'Supraspinal ligament one': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True},
-                    'Interspinal ligament': {'D_TISSUE': D_TISSUE_INTER,'max_tissue_force': MAX_TISSUE_INTER, 'collision_bool': True, 'update_bool': True},
-                    'Ligamentum flavum': {'D_TISSUE': D_TISSUE_FLAVUM,'max_tissue_force': MAX_TISSUE_FLAVUM, 'collision_bool': True, 'update_bool': True},
-                    'Cerebrospinal fluid one': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID, 'collision_bool': True, 'update_bool': True},
-                    'Spinal cord': {'D_TISSUE': D_TISSUE_CORD,'max_tissue_force': MAX_TISSUE_CORD, 'collision_bool': True, 'update_bool': True},
-                    'Cerebrospinal fluid two': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID , 'collision_bool': True, 'update_bool': True},
-                    'Supraspinal ligament two': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True},
-                    'Cartilage': {'D_TISSUE': D_TISSUE_CART,'max_tissue_force': MAX_TISSUE_CART, 'collision_bool': True, 'update_bool': True},
-                    'Supraspinal ligament three': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True}}
+variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TISSUE_SKIN, 'collision_bool': True, 'update_bool': True, 'penetration_bool': False},
+                    'Fat' : {'D_TISSUE': D_TISSUE_FAT,'max_tissue_force': MAX_TISSUE_FAT, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Supraspinal ligament one': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Interspinal ligament': {'D_TISSUE': D_TISSUE_INTER,'max_tissue_force': MAX_TISSUE_INTER, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Ligamentum flavum': {'D_TISSUE': D_TISSUE_FLAVUM,'max_tissue_force': MAX_TISSUE_FLAVUM, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Cerebrospinal fluid one': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Spinal cord': {'D_TISSUE': D_TISSUE_CORD,'max_tissue_force': MAX_TISSUE_CORD, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Cerebrospinal fluid two': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID , 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Supraspinal ligament two': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Cartilage': {'D_TISSUE': D_TISSUE_CART,'max_tissue_force': MAX_TISSUE_CART, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Supraspinal ligament three': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False}}
 
 
 
@@ -446,20 +446,35 @@ while run:
                 print("Max tissue force: ", max_tissue_force)
 
                 # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
-                if collision_bool and update_bool and i>120:
+                if update_bool and i>120:
                     phold = xh
                     variable_dict[collision]['update_bool'] = False
 
-                # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
-                F_pen = (reference_pos[0]-phold[0])*0.1
                 
-                if F_pen > max_tissue_force and collision_bool and i > 120:
-                    penetrated = True
+                penetration_bool = variable_dict[collision]['penetration_bool']
+                # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
+                if not penetration_bool:
+                    F_pen = (reference_pos[0]-phold[0])*0.1
                 else:
-                    penetrated = False
-
-                if not penetrated and collision_bool and dxh[0] > 0:
+                    F_pen = 0
+                
+                if F_pen > max_tissue_force:
+                    variable_dict[collision]['penetration_bool'] = True
+                    penetration_bool = True
+            
+                if xh[0] > reference_pos[0]:
+                    pass
+                elif not penetration_bool:
                     dxh = np.zeros(2)
+
+                
+                
+        if all(value == False for value in collision_dict.values()):
+            for collision in collision_dict:
+                if collision not in Bones:
+                    variable_dict[collision]['penetration_bool'] = False
+                    variable_dict[collision]['update_bool'] = True
+
                     
         #dxh = (K_TISSUE/D_TISSUE*(xm-xh)/window_scale -fe/D_TISSUE)  ####replace with the valid expression that takes all the forces into account
         #dxh = dxh*window_scale
