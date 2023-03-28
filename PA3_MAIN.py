@@ -8,9 +8,17 @@ from pshape import PShape
 import sys, serial, glob
 from serial.tools import list_ports
 import time
+import pandas as pd
+import os
+
+
+
+
 
 ##################### General Pygame Init #####################
-
+def rotMat(angle):
+    transformation_matrix = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle),  np.cos(angle)]])
+    return transformation_matrix
 
 ##initialize pygame window
 pygame.init()
@@ -38,7 +46,7 @@ xc,yc = screenVR.get_rect().center ##center of the screen
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
-FPS = 200   #in Hertz
+FPS = 100   #in Hertz
 
 ## Define colors to be used to render different tissue layers and haptic
 cSkin      = (210,161,140)
@@ -97,7 +105,7 @@ fat_penetrated  = False
 D_TISSUE_SKIN   = 5
 D_TISSUE_FAT    = 10
 D_TISSUE_SUPRA  = 15
-D_TISSUE_INTER  = 20
+D_TISSUE_INTER  = 40
 D_TISSUE_FLAVUM = 20
 D_TISSUE_FLUID  = 10
 D_TISSUE_CORD   = 5
@@ -108,8 +116,8 @@ MAX_TISSUE_SKIN     = 1
 MAX_TISSUE_FAT      = 2 
 MAX_TISSUE_SUPRA    = 3
 MAX_TISSUE_INTER    = 2
-MAX_TISSUE_FLAVUM   = 5
-MAX_TISSUE_FLUID    = 1
+MAX_TISSUE_FLAVUM   = 1
+MAX_TISSUE_FLUID    = 0.5
 MAX_TISSUE_CORD     = 1
 MAX_TISSUE_CART     = 5
 
@@ -206,7 +214,8 @@ pantograph = Pantograph
 robot = PShape
 reset = True
 
-
+bone_collision_count = 0
+spinal_coord_collision_hit = False
 #########Open the connection with the arduino board#########
 port = serial_ports()   ##port contains the communication port or False if no device
 if port:
@@ -254,12 +263,13 @@ still_penetrated = False
 dt = 0.01 # intergration step timedt = 0.01 # integration step time
 dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
 i = 0
+t = 0
 
 #init damping
 damping = np.zeros(2)
 
 # Initialize general stiffness factor of our system
-K = np.diag([1000,1000])
+K = np.diag([1000,1000]) # stiffness matrix N/m
 
 while run:
     penetration = True
@@ -278,17 +288,18 @@ while run:
 
             ##Rotate the needle
             if event.key ==ord('r'):
-                needle_rotation +=1
-                alpha += np.deg2rad(1)
+                needle_rotation +=5
+                alpha += np.deg2rad(5)
             if event.key ==ord('e'):
-                needle_rotation -= 1
-                alpha -= np.deg2rad(1)
+                needle_rotation -= 5
+                alpha -= np.deg2rad(5)
 
             #visualisation of walls
             if event.key ==ord('o'):
                 visiualse_walls = True
             if event.key ==ord('p'):
                 visiualse_walls = False
+                
 
 
     ######### Read position (Haply and/or Mouse)  #########
@@ -319,7 +330,7 @@ while run:
     ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
 
     # Define haptic center and endpoint of our haptic (needle tip)
-    haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*150,haptic.center[1]+np.sin(alpha)*150, 1, 1)
+    haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*250,haptic.center[1]+np.sin(alpha)*250, 1, 1)
     
     # Create endpoint masks for collision detection between endpoint and drawn vertebrae (odd shape so cannot be rendered using rectangles)
     haptic_endpoint_mask = pygame.mask.Mask((haptic_endpoint.width, haptic_endpoint.height))
@@ -406,10 +417,10 @@ while run:
         collision_bone = True
     else:
         pass
-       
+    
     # Compute the endpoint force which acts at needle tip
-    fe = K @ (xm-xh) - 2*0.7*np.sqrt(K)@dxh
-
+    fe = K @ (xm-xh) - (2*0.7*np.sqrt(K) @ dxh)
+    #print("xm:",xm,"xh:",xh,"fe:",fe,"dxh:",dxh)
     # Compute damping force
     fd = -damping @ endpoint_velocity
  
@@ -422,16 +433,19 @@ while run:
         device.device_write_torques()
         #pause for 1 millisecond
         time.sleep(0.001)
-
+   
     else: 
-        ddxh = fe
+        ddxh = fe 
+       
         #update velocity to accomodate damping
-        dxh += ddxh*dt - fd
+        dxh += ddxh*dt 
 
         # In case collision occurs with vertebrae simulate an infinitely stiff bone
         if collision_bone and away_from_bone:
             phold = xh
             away_from_bone = False
+            bone_collision_count += 0.5
+
         if reference_pos[0] >= phold[0] and not away_from_bone:
             dxh = np.zeros(2)
         else: 
@@ -444,7 +458,8 @@ while run:
                 # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
                 max_tissue_force = variable_dict[collision]['max_tissue_force']
                 #print("Max tissue force: ", max_tissue_force)
-
+                if collision == 'Spinal cord' and i>120:
+                    spinal_coord_collision_hit = True
                 # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
                 if update_bool and i>120:
                     phold = xh
@@ -454,7 +469,7 @@ while run:
 
                 # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
                 if not penetration_bool:
-                    F_pen = (reference_pos[0]-phold[0])*0.1
+                    F_pen = (reference_pos[0]-phold[0])*0.1*math.cos(alpha)
                 else:
                     F_pen = 0
                 
@@ -474,15 +489,20 @@ while run:
                 if collision not in Bones:
                     variable_dict[collision]['penetration_bool'] = False
                     variable_dict[collision]['update_bool'] = True
+                  
 
                     
         #dxh = (K_TISSUE/D_TISSUE*(xm-xh)/window_scale -fe/D_TISSUE)  ####replace with the valid expression that takes all the forces into account
         #dxh = dxh*window_scale
-        #xh = np.round(xh+dxh)             ##update new positon of the end effector
+        #xh = np.round(xh+dxh)             ##update new positon of the end effector 
+        # 
+        #  
+          
         xh = dxh*dt + xh
-        i+=1
+        i += 1
+        t += dt
     haptic.center = xh 
-    
+  
     ######### Graphical output #########
     ##Render the haptic surface
     screenHaptics.fill(cWhite)
@@ -503,7 +523,7 @@ while run:
         
     ##Render the VR surface
     screenVR.fill(cWhite)
-
+  
     ### Visualize all components of the simulation
 
     # Draw all the vertical tissue layers
@@ -541,7 +561,7 @@ while run:
     screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))  
 
     # Draw needle 
-    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*150, haptic.center[1]+ np.sin(alpha)*150), 2 )
+    pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*250, haptic.center[1]+ np.sin(alpha)*250), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
 
@@ -559,7 +579,6 @@ while run:
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
 
-
     pygame.display.flip()   
 
     ##Slow down the loop to match FPS
@@ -567,3 +586,14 @@ while run:
 
 pygame.display.quit()
 pygame.quit()
+
+
+#save metrics to the 
+d = [['Participant'],
+     ['Time taken: ','{0:.2f}'.format(t),' s'],
+     ['Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0]),' pixels'],
+     ['Number of bone hits: ',int(bone_collision_count-1)],
+     ['Spinal coord hit: ',spinal_coord_collision_hit],
+     ['']]
+df = pd.DataFrame(data=d)
+df.to_csv('test_csv.csv',mode='a',header=False,index=False)
