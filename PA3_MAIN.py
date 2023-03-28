@@ -104,12 +104,12 @@ fat_penetrated  = False
 # Set all environment parameters to simulate damping in the various tissue layers
 D_TISSUE_SKIN   = 5
 D_TISSUE_FAT    = 10
-D_TISSUE_SUPRA  = 15
-D_TISSUE_INTER  = 40
-D_TISSUE_FLAVUM = 20
+D_TISSUE_SUPRA  = 5
+D_TISSUE_INTER  = 5
+D_TISSUE_FLAVUM = 5
 D_TISSUE_FLUID  = 10
 D_TISSUE_CORD   = 5
-D_TISSUE_CART   = 30
+D_TISSUE_CART   = 5
 
 #  Set all environment parameters to simulate damping in the various tissue layers
 MAX_TISSUE_SKIN     = 1
@@ -216,6 +216,11 @@ reset = True
 
 bone_collision_count = 0
 spinal_coord_collision_hit = False
+max_force_exerted = np.zeros(2)
+record_deviation_y = []
+y_loc = 0
+set_hold = True
+xhhold = np.zeros(2)
 #########Open the connection with the arduino board#########
 port = serial_ports()   ##port contains the communication port or False if no device
 if port:
@@ -420,9 +425,18 @@ while run:
     
     # Compute the endpoint force which acts at needle tip
     fe = K @ (xm-xh) - (2*0.7*np.sqrt(K) @ dxh)
+
+    #find maximum force exerted
+    if i>120:
+        if fe[0] > max_force_exerted[0]:
+            max_force_exerted[0] = fe[0]
+        if fe[1] > max_force_exerted[1]:
+            max_force_exerted[1] = fe[1]
+
     #print("xm:",xm,"xh:",xh,"fe:",fe,"dxh:",dxh)
     # Compute damping force
     fd = -damping @ endpoint_velocity
+    print(fd)
  
     ######### Send computed forces to the device #########
     if port:
@@ -436,9 +450,9 @@ while run:
    
     else: 
         ddxh = fe 
-       
+        
         #update velocity to accomodate damping
-        dxh += ddxh*dt 
+        dxh += ddxh*dt - fd
 
         # In case collision occurs with vertebrae simulate an infinitely stiff bone
         if collision_bone and away_from_bone:
@@ -464,6 +478,14 @@ while run:
                 if update_bool and i>120:
                     phold = xh
                     variable_dict[collision]['update_bool'] = False
+
+                #find standard deviation
+                if i>120:
+                    dev = xh - xhhold
+                    length = np.linalg.norm(dev)
+                    dy = dev[1] - length*math.cos(-alpha)
+                    dx = dev[0] - length*math.sin(-alpha)
+                    record_deviation_y.append([dx,dy])
 
                 penetration_bool = variable_dict[collision]['penetration_bool']
 
@@ -497,7 +519,7 @@ while run:
         #xh = np.round(xh+dxh)             ##update new positon of the end effector 
         # 
         #  
-          
+        xhhold = xh
         xh = dxh*dt + xh
         i += 1
         t += dt
@@ -587,13 +609,14 @@ while run:
 pygame.display.quit()
 pygame.quit()
 
-
-#save metrics to the 
+#save metrics to the csv file
 d = [['Participant'],
      ['Time taken: ','{0:.2f}'.format(t),' s'],
      ['Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0]),' pixels'],
      ['Number of bone hits: ',int(bone_collision_count-1)],
      ['Spinal coord hit: ',spinal_coord_collision_hit],
+     ['Maximum exerted force: ',max_force_exerted/10000],
+     ['Deviation inside of tissue: ',record_deviation_y],
      ['']]
 df = pd.DataFrame(data=d)
 df.to_csv('test_csv.csv',mode='a',header=False,index=False)
