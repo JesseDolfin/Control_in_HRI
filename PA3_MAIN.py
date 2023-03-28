@@ -255,8 +255,12 @@ dt = 0.01 # intergration step timedt = 0.01 # integration step time
 dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
 i = 0
 
+#init damping
+damping = np.zeros(2)
 
-damping = 0
+# Initialize general stiffness factor of our system
+K = np.diag([1000,1000])
+
 while run:
     penetration = True
     collision_bone = False
@@ -374,10 +378,7 @@ while run:
     # Based on SOURCE we will implement a multilayer force displacement model as follows:
     # ~ Pre-puncture:  R_F = S_f 
     # ~ Post-puncture: R_F = C_f + F_f
-    
-    # Initialize general stiffness factor of our system
-    K = 1000
-    
+      
     # Compute endpoint velocity and update previous haptic state
     endpoint_velocity = (xhold - xh)/FPS
     
@@ -392,13 +393,13 @@ while run:
             
             # For the objects(tissues) in collision with the needle tip set the damping value of the environment accordingly
             # Additionally, flip positional and collision boolean
-            damping        = variable_dict[collision]['D_TISSUE']*K
+            damping        = K * variable_dict[collision]['D_TISSUE']
             collision_bool = variable_dict[collision]['collision_bool']
             update_bool    = variable_dict[collision]['update_bool']
     
     # In case no collisions are detected default the damping value of the environment to zero
     if all(value == False for value in collision_dict.values()):
-        damping = 0
+        damping = np.zeros(2)
     
     # Check if any of the rectangular vertebrae are in collision, if so flip bone collision boolean to limit needle movement
     if collision_dict['Vertebrae one'] or collision_dict['Vertebrae two'] or collision_dict['Vertebrae three'] or collision_dict['Vertebrae four'] or collision_dict['Vertebrae five']:
@@ -407,10 +408,11 @@ while run:
         pass
        
     # Compute the endpoint force which acts at needle tip
-    fd = -endpoint_velocity*damping
-    fe = K* (xm-xh) - 2*0.7*np.sqrt(K)*dxh
+    fe = K @ (xm-xh) - 2*0.7*np.sqrt(K)@dxh
 
-
+    # Compute damping force
+    fd = -damping @ endpoint_velocity
+ 
     ######### Send computed forces to the device #########
     if port:
         fe[1] = -fe[1]  ##Flips the force on the Y=axis 
@@ -423,7 +425,6 @@ while run:
 
     else: 
         ddxh = fe
-
         #update velocity to accomodate damping
         dxh += ddxh*dt - fd
 
@@ -440,18 +441,17 @@ while run:
         Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five'}
         for collision in collision_dict:
             if collision not in Bones and collision_dict[collision] == True:
-                
                 # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
                 max_tissue_force = variable_dict[collision]['max_tissue_force']
-                print("Max tissue force: ", max_tissue_force)
+                #print("Max tissue force: ", max_tissue_force)
 
                 # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
                 if update_bool and i>120:
                     phold = xh
                     variable_dict[collision]['update_bool'] = False
 
-                
                 penetration_bool = variable_dict[collision]['penetration_bool']
+
                 # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
                 if not penetration_bool:
                     F_pen = (reference_pos[0]-phold[0])*0.1
@@ -482,7 +482,6 @@ while run:
         xh = dxh*dt + xh
         i+=1
     haptic.center = xh 
-    
     
     ######### Graphical output #########
     ##Render the haptic surface
