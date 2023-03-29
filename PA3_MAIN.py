@@ -12,7 +12,7 @@ import pandas as pd
 
 ##################### General Pygame Init #####################
 def rotMat(angle):
-    transformation_matrix = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle),  np.cos(angle)]])
+    transformation_matrix = np.array([[np.cos(-angle), np.sin(-angle)],[-np.sin(-angle),  np.cos(-angle)]])
     return transformation_matrix
 
 
@@ -66,7 +66,7 @@ D = 1.5      ##Viscous of the pseudohaptic display
 
 # Load in transparant object images and convert to alpha channel
 vertebrae_layer  = pygame.image.load("vertebra_test.png").convert_alpha()
-vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(140,140))
+vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(63,85))
 
 # Create pixel masks for every object 
 vertebrae_mask   = pygame.mask.from_surface(vertebrae_layer)
@@ -105,41 +105,43 @@ alpha = 0
 robotToggle = True
 debugToggle = True
 away_from_bone = True
+spinal_coord_collision = False
+toggle_visual = True
    
 # Set all environment parameters to simulate damping in the various tissue layers
-D_TISSUE_SKIN   = 5
-D_TISSUE_FAT    = 10
-D_TISSUE_SUPRA  = 5
-D_TISSUE_INTER  = 5
-D_TISSUE_FLAVUM = 5
-D_TISSUE_FLUID  = 10
-D_TISSUE_CORD   = 5
-D_TISSUE_CART   = 5
+D_TISSUE_SKIN   = 14.4 # dens = 1.1kg/L
+D_TISSUE_FAT    = 11.8 # dens = 0.9kg/L
+D_TISSUE_SUPRA  = 15   # dens = 1.142kg/L
+D_TISSUE_INTER  = 15   # dens = 1.142kg/L
+D_TISSUE_FLAVUM = 15   # dens = 1.142kg/L
+D_TISSUE_FLUID  = 13.2 # dens = 1.007kg/L
+D_TISSUE_CORD   = 14   # dens = 1.075/L
+D_TISSUE_CART   = 14.4 # dens = 1.1kg/L
 
 #  Set all environment parameters to simulate damping in the various tissue layers
-MAX_TISSUE_SKIN     = 1
-MAX_TISSUE_FAT      = 2 
-MAX_TISSUE_SUPRA    = 3
-MAX_TISSUE_INTER    = 2
-MAX_TISSUE_FLAVUM   = 1
-MAX_TISSUE_FLUID    = 0.5
-MAX_TISSUE_CORD     = 1
-MAX_TISSUE_CART     = 5
+MAX_TISSUE_SKIN     = 1 #6.037
+MAX_TISSUE_FAT      = 0.36 #2.2
+MAX_TISSUE_SUPRA    = 1.49 #9
+MAX_TISSUE_INTER    = 1.24 #7.5
+MAX_TISSUE_FLAVUM   = 2 #12.1
+MAX_TISSUE_FLUID    = 0.4 #2.4
+MAX_TISSUE_CORD     = 0.4 #2.4
+MAX_TISSUE_CART     = 5 #
 
 # Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
-simulation_space  = [[300, 600, 300], [0, 600, 600]]
+simulation_space  = [[350, 600, 300], [0, 600, 600]]
 
-# Initialize adjustable scaling factors to play around with tissue size
-wall_size_factor1 = 0.05      # SKIN
-wall_size_factor2 = 0.125     # FAT
-wall_size_factor3 = 0.025     # SUPRASPINAL LIGAMENT
-wall_size_factor4 = 0.4       # INTERSPINAL LIGAMENT
-wall_size_factor5 = 0.05      # LIGAMENTUM FLAVUM
-wall_size_factor6 = 0.0375    # CEREBROSPINAL FLUID
-wall_size_factor7 = 0.075     # SPINAL CORD
-wall_size_factor8 = 0.15      # VERTEBRAE ONE
-wall_size_factor9 = 0.4       # CARTILAGE
-wall_size_factor10 = 0.15     # VERTEBRAE TWO
+# Initialize adjustable scaling factors to play around with tissue size 2 px / mm
+wall_size_factor1 = 0.04      # SKIN , 5.6 mm 
+wall_size_factor2 = 0.075     # FAT 
+wall_size_factor3 = 1/150     # SUPRASPINAL LIGAMENT 0.72mm
+wall_size_factor4 = 0.2       # INTERSPINAL LIGAMENT 30 mm
+wall_size_factor5 = 0.03      # LIGAMENTUM FLAVUM 4.5 mm
+wall_size_factor6 = 1/37.5    # CEREBROSPINAL FLUID 4 mm
+wall_size_factor7 = 0.1       # SPINAL CORD 15 mm
+wall_size_factor8 = 1/13      # VERTEBRAE ONE 11.5 mm
+wall_size_factor9 = 0.393333  # CARTILAGE disk 118 mm
+wall_size_factor10 = 1/11.5   # VERTEBRAE TWO 
 
 # Vertical wall layers (x, y, width, height)
 wall_layer1  = pygame.Rect(simulation_space[0][0],simulation_space[1][0],wall_size_factor1*(simulation_space[0][2]),simulation_space[1][2])
@@ -160,20 +162,21 @@ wall_layer13 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_size_factor8*simul
 wall_layer14 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer13[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 wall_layer15 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer14[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 wall_layer16 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer15[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
+wall_layer17 = pygame.Rect(wall_layer9[0]+wall_layer9[2],wall_layer16[1] + wall_size_factor8*simulation_space[1][2]+30,wall_size_factor9*(simulation_space[0][2]),wall_size_factor8*simulation_space[1][2])
 
 # Store all objects in a dict which can be accessed for collision detection
 objects_dict = {'Skin': wall_layer1, 'Fat': wall_layer2, 'Supraspinal ligament one': wall_layer3, 'Interspinal ligament': wall_layer4,
                 'Ligamentum flavum': wall_layer5, 'Cerebrospinal fluid one': wall_layer6, 'Spinal cord': wall_layer7,
                 'Cerebrospinal fluid two': wall_layer8, 'Supraspinal ligament two':  wall_layer9, 'Cartilage': wall_layer10,
                 'Supraspinal ligament three': wall_layer11, 'Vertebrae one': wall_layer12, 'Vertebrae two': wall_layer13,
-                'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16}
+                'Vertebrae three': wall_layer14, 'Vertebrae four': wall_layer15, 'Vertebrae five': wall_layer16,'Vertebrae six':wall_layer17}
 
 # Initialize a collision dictionary to store booleans corresponding to all objects that are in collision
 collision_dict = {'Skin': False, 'Fat': False, 'Supraspinal ligament one': False, 'Interspinal ligament': False,
                     'Ligamentum flavum': False, 'Cerebrospinal fluid one': False, 'Spinal cord': False,
                     'Cerebrospinal fluid two': False, 'Supraspinal ligament two':  False, 'Cartilage': False,
                     'Supraspinal ligament three': False, 'Vertebrae one': False, 'Vertebrae two': False,
-                    'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False}
+                    'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False,'Vertebrae six':False}
 
 # Initialize a dictonary which holds all the simulation parameters for efficiency
 variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TISSUE_SKIN, 'collision_bool': True, 'update_bool': True, 'penetration_bool': False},
@@ -190,11 +193,12 @@ variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TIS
 
 
 # Compose the rectangles belonging to every vertebrae
-vert_rect1 = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect2 = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect3 = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect4 = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect5 = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect1 = [wall_layer3[0],-0.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect2 = [wall_layer3[0],0.25*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect3 = [wall_layer3[0],1.15*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect4 = [wall_layer3[0],2.05*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect5 = [wall_layer3[0],2.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect6 = [wall_layer3[0],3.85*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
 
 ##################### Detect and Connect Physical device #####################
 # USB serial microcontroller program id data:
@@ -277,6 +281,10 @@ while run:
             if event.key ==ord('e'):
                 needle_rotation -= 5
                 alpha -= np.deg2rad(5)
+
+            # Toggle between visual feedback or not
+            if event.key ==ord('v'):
+                toggle_visual = not toggle_visual
                 
 
 
@@ -297,14 +305,12 @@ while run:
          
     else:
         ##Compute distances and forces between blocks
-        xh = np.clip(np.array(haptic.center),0,599)
-        xh = np.round(xh)
+        xh = np.array(haptic.center)
         
         ##Get mouse position
         cursor = pygame.mouse.get_pos()
-        xm = np.clip(np.array(cursor),0,599)
+        xm = np.array(cursor) 
     
-
     ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
     # Define haptic center and endpoint of our haptic (needle tip)
     haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*250,haptic.center[1]+np.sin(alpha)*250, 1, 1)
@@ -364,10 +370,10 @@ while run:
     # Compute endpoint velocity and update previous haptic state
     endpoint_velocity = (xhold - xh)/FPS
     xhold = xh
-
+   
     # Loop over all the rectangular objects and check for collision, note that we exclude the vertebrae from the loop
     # The reason being that these are modelled infinitely stiff so they don't need damping etc.
-    Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five'}
+    Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five','Vertebrae six'}
     for collision in collision_dict:
         if collision not in Bones and collision_dict[collision] == True:
             
@@ -382,14 +388,14 @@ while run:
         damping = np.zeros(2)
     
     # Check if any of the rectangular vertebrae are in collision, if so flip bone collision boolean to limit needle movement
-    if collision_dict['Vertebrae one'] or collision_dict['Vertebrae two'] or collision_dict['Vertebrae three'] or collision_dict['Vertebrae four'] or collision_dict['Vertebrae five']:
+    if collision_dict['Vertebrae one'] or collision_dict['Vertebrae two'] or collision_dict['Vertebrae three'] or collision_dict['Vertebrae four'] or collision_dict['Vertebrae five'] or collision_dict['Vertebrae six']:
         collision_bone = True
     else:
         pass
     
     # Compute the endpoint force which acts at needle tip
-    fe = K @ (xm-xh) - (2*0.7*np.sqrt(K) @ dxh)
-
+    fe = (K @ (xm-xh) - (2*0.7*np.sqrt(K) @ dxh)) 
+   
     #find maximum force exerted
     if i>120:
         if fe[0] > max_force_exerted[0]:
@@ -399,9 +405,9 @@ while run:
 
     #print("xm:",xm,"xh:",xh,"fe:",fe,"dxh:",dxh)
     # Compute damping force
-    fd = -damping @ endpoint_velocity
+    fd = -damping @ endpoint_velocity 
 
- 
+    
     ######### Send computed forces to the device #########
     if port:
         fe[1] = -fe[1]  ##Flips the force on the Y=axis 
@@ -411,10 +417,9 @@ while run:
         device.device_write_torques()
         #pause for 1 millisecond
         time.sleep(0.001)
-   
     else: 
         ddxh = fe 
-        
+     
         #update velocity to accomodate damping
         dxh += ddxh*dt - fd
 
@@ -430,7 +435,7 @@ while run:
             away_from_bone =  True
 
         # Loop over the detected collisions dictonary (excluding vertebrae), in case collision is detected retrieve tissue parameters from parameter dict
-        Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five'}
+        Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five', 'Vertebrae six'}
         for collision in collision_dict:
             if collision not in Bones and collision_dict[collision] == True:
                 # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
@@ -438,6 +443,9 @@ while run:
                 #print("Max tissue force: ", max_tissue_force)
                 if collision == 'Spinal cord' and i>120:
                     spinal_coord_collision_hit = True
+                    spinal_coord_collision = True
+                else:
+                    spinal_coord_collision = False
                 # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
                 if update_bool and i>120:
                     phold = xh
@@ -490,8 +498,9 @@ while run:
         xh = dxh*dt + xh
         i += 1
         t += dt
+   
     haptic.center = xh 
-  
+
     ######### Graphical output #########
     ##Render the haptic surface
     screenHaptics.fill(cWhite)
@@ -534,25 +543,24 @@ while run:
     pygame.draw.rect(screenVR,cVerte,wall_layer14, border_radius = 4)
     pygame.draw.rect(screenVR,cVerte,wall_layer15, border_radius = 4)
     pygame.draw.rect(screenVR,cVerte,wall_layer16, border_radius = 4)
-
-    # Draw the masks  
-    vert_pos_one   = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_pos_two   = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_pos_three = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_pos_four  = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_pos_five  = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+    pygame.draw.rect(screenVR,cVerte,wall_layer17, border_radius = 4)
 
     # Draw all the vertebrae
-    screenVR.blit(vertebrae_layer,(vert_pos_one[0],vert_pos_one[1])) 
-    screenVR.blit(vertebrae_layer,(vert_pos_two[0],vert_pos_two[1]))
-    screenVR.blit(vertebrae_layer,(vert_pos_three[0],vert_pos_three[1]))
-    screenVR.blit(vertebrae_layer,(vert_pos_four[0],vert_pos_four[1]))
-    screenVR.blit(vertebrae_layer,(vert_pos_five[0],vert_pos_five[1]))  
+    screenVR.blit(vertebrae_layer,(vert_rect1[0],vert_rect1[1])) 
+    screenVR.blit(vertebrae_layer,(vert_rect2[0],vert_rect2[1]))
+    screenVR.blit(vertebrae_layer,(vert_rect3[0],vert_rect3[1]))
+    screenVR.blit(vertebrae_layer,(vert_rect4[0],vert_rect4[1]))
+    screenVR.blit(vertebrae_layer,(vert_rect5[0],vert_rect5[1]))  
+    screenVR.blit(vertebrae_layer,(vert_rect6[0],vert_rect6[1]))
 
     # Draw needle 
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*250, haptic.center[1]+ np.sin(alpha)*250), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
+    
+    #toggle a mask over the spine
+    if toggle_visual:
+        pygame.draw.rect(screenVR,cVerte,(simulation_space[0][0],0,simulation_space[0][1],simulation_space[1][1]), border_radius = 0)
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
@@ -562,11 +570,16 @@ while run:
     if debugToggle: 
         
         text = font.render("FPS = " + str(round(clock.get_fps())) + \
-                            "  xm = " + str(np.round(10*xm)/10) +\
-                            "  xh = " + str(np.round(10*xh)/10) +\
-                            "  fe = " + str(np.round(10*fe)/10) \
+                            "  xm = " + str(np.round(10*xm)/20000) +\
+                            "  xh = " + str(np.round(10*xh)/20000) +\
+                            "  fe = " + str(np.round(10*fe)/20000) \
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
+
+
+    if spinal_coord_collision:
+        GB = min(255, max(0, round(255 * 0.5)))
+        window.fill((255, GB, GB), special_flags = pygame.BLEND_MULT)
 
     pygame.display.flip()   
 
