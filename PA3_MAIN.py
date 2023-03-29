@@ -43,7 +43,7 @@ center = np.array([xc,yc])
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
-FPS = 100   #in Hertz
+FPS = 200   #in Hertz
 
 ## Define colors to be used to render different tissue layers and haptic
 cSkin      = (210,161,140)
