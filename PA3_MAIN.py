@@ -9,16 +9,12 @@ import sys, serial, glob
 from serial.tools import list_ports
 import time
 import pandas as pd
-import os
-
-
-
-
 
 ##################### General Pygame Init #####################
 def rotMat(angle):
     transformation_matrix = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle),  np.cos(angle)]])
     return transformation_matrix
+
 
 ##initialize pygame window
 pygame.init()
@@ -43,6 +39,7 @@ textRect = text.get_rect()
 textRect.topleft = (10, 10)
 
 xc,yc = screenVR.get_rect().center ##center of the screen
+center = np.array([xc,yc]) 
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
@@ -70,13 +67,9 @@ D = 1.5      ##Viscous of the pseudohaptic display
 # Load in transparant object images and convert to alpha channel
 vertebrae_layer  = pygame.image.load("vertebra_test.png").convert_alpha()
 vertebrae_layer  = pygame.transform.scale(vertebrae_layer,(140,140))
-needle           = pygame.image.load("lumbar_needle.png").convert_alpha()
-needle           = pygame.transform.scale(needle,(200,25))
-needle_undeformed = needle.copy()
 
 # Create pixel masks for every object 
 vertebrae_mask   = pygame.mask.from_surface(vertebrae_layer)
-needle_mask      = pygame.mask.from_surface(needle)
 
 # Get the rectangles and obstacle locations for rendering and mask offset
 vertebrae_rect   = vertebrae_mask.get_rect()
@@ -84,23 +77,35 @@ vertebrae_rect   = vertebrae_mask.get_rect()
 haptic  = pygame.Rect(*screenHaptics.get_rect().center, 0, 0).inflate(40,40)
 cursor  = pygame.Rect(0, 0, 5, 5)
 colorHaptic = cOrange ##color of the wall
-dxh = np.zeros(2)
 
+'''Init all variables'''
 xh = np.array(haptic.center,dtype='int32')
-
-##Set the old value to 0 to avoid jumps at init
+dxh = np.zeros(2)
 xhold = np.zeros(2)
-xmold = 0
+phold = np.zeros(2)
 
-##################### Init Virtual env. #####################
-visiualse_walls = True
+damping = np.zeros(2)
+K = np.diag([1000,1000]) # stiffness matrix N/m
+dt = 0.01 # intergration step timedt = 0.01 # integration step time
+i = 0 # loop counter
+t = 0 # time
+
+# Metrics
+max_force_exerted = np.zeros(2)
+bone_collision_count = 0
+record_deviation_y = []
+xhhold = np.zeros(2)
+spinal_coord_collision_hit = False
+
+# Init Virtual env.
 needle_rotation = 0
 alpha = 0
-collision = False
-skin_penetrated = False
-fat_penetrated  = False
 
-
+# Declare some simulation booleans to switch between states
+robotToggle = True
+debugToggle = True
+away_from_bone = True
+   
 # Set all environment parameters to simulate damping in the various tissue layers
 D_TISSUE_SKIN   = 5
 D_TISSUE_FAT    = 10
@@ -184,6 +189,12 @@ variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TIS
                     'Supraspinal ligament three': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False}}
 
 
+# Compose the rectangles belonging to every vertebrae
+vert_rect1 = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect2 = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect3 = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect4 = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect5 = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
 
 ##################### Detect and Connect Physical device #####################
 # USB serial microcontroller program id data:
@@ -204,23 +215,15 @@ def serial_ports():
             pass
     return result
 
+# haply stuff
 CW = 0
 CCW = 1
-
 haplyBoard = Board
 device = Device
 SimpleActuatorMech = Mechanisms
 pantograph = Pantograph
 robot = PShape
-reset = True
 
-bone_collision_count = 0
-spinal_coord_collision_hit = False
-max_force_exerted = np.zeros(2)
-record_deviation_y = []
-y_loc = 0
-set_hold = True
-xhhold = np.zeros(2)
 #########Open the connection with the arduino board#########
 port = serial_ports()   ##port contains the communication port or False if no device
 if port:
@@ -250,32 +253,8 @@ window_scale = 3
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
 
-# Declare some simulation booleans to switch between states
+
 run = True
-ongoingCollision = False
-fieldToggle = True
-robotToggle = True
-debugToggle = True
-vert_col = False
-flag = True
-away_from_bone = True
-center = np.array([xc,yc])    
-allow_movement = True
-phold = np.zeros(2)
-penetrated = False
-still_penetrated = False
-
-dt = 0.01 # intergration step timedt = 0.01 # integration step time
-dts = dt*1 # desired simulation step time (NOTE: it may not be achieved)
-i = 0
-t = 0
-
-#init damping
-damping = np.zeros(2)
-
-# Initialize general stiffness factor of our system
-K = np.diag([1000,1000]) # stiffness matrix N/m
-
 while run:
     penetration = True
     collision_bone = False
@@ -298,12 +277,6 @@ while run:
             if event.key ==ord('e'):
                 needle_rotation -= 5
                 alpha -= np.deg2rad(5)
-
-            #visualisation of walls
-            if event.key ==ord('o'):
-                visiualse_walls = True
-            if event.key ==ord('p'):
-                visiualse_walls = False
                 
 
 
@@ -333,7 +306,6 @@ while run:
     
 
     ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
-
     # Define haptic center and endpoint of our haptic (needle tip)
     haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*250,haptic.center[1]+np.sin(alpha)*250, 1, 1)
     
@@ -341,13 +313,7 @@ while run:
     haptic_endpoint_mask = pygame.mask.Mask((haptic_endpoint.width, haptic_endpoint.height))
     haptic_endpoint_mask.fill()
 
-    # Compose the rectangles belonging to every vertebrae
-    vert_rect1 = [wall_layer3[0],-0.75*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_rect2 = [wall_layer3[0],0.1*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_rect3 = [wall_layer3[0],0.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_rect4 = [wall_layer3[0],1.8*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-    vert_rect5 = [wall_layer3[0],2.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-
+ 
     # Compute offset between haptic endpoint and every vertebrae mask
     xoffset1 = vert_rect1[0] - haptic_endpoint[0]
     yoffset1 = vert_rect1[1] - haptic_endpoint[1]
@@ -397,9 +363,7 @@ while run:
       
     # Compute endpoint velocity and update previous haptic state
     endpoint_velocity = (xhold - xh)/FPS
-    
     xhold = xh
-    xmold = xm
 
     # Loop over all the rectangular objects and check for collision, note that we exclude the vertebrae from the loop
     # The reason being that these are modelled infinitely stiff so they don't need damping etc.
