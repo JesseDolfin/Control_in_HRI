@@ -400,7 +400,7 @@ while run:
     #print("xm:",xm,"xh:",xh,"fe:",fe,"dxh:",dxh)
     # Compute damping force
     fd = -damping @ endpoint_velocity
-    print(fd)
+
  
     ######### Send computed forces to the device #########
     if port:
@@ -445,10 +445,13 @@ while run:
 
                 #find standard deviation
                 if i>120:
-                    dev = xh - xhhold
-                    length = np.linalg.norm(dev)
-                    dy = dev[1] - length*math.cos(-alpha)
-                    dx = dev[0] - length*math.sin(-alpha)
+                    dev = np.abs(xh - xhhold)
+                    dx = dev[0]
+                    dy = dev[1]
+
+                    dx *= math.sin(-alpha)
+                    dy *= math.cos(-alpha)
+             
                     record_deviation_y.append([dx,dy])
 
                 penetration_bool = variable_dict[collision]['penetration_bool']
@@ -573,6 +576,17 @@ while run:
 pygame.display.quit()
 pygame.quit()
 
+record_deviation_y = np.array(record_deviation_y)
+
+try:
+   dy = record_deviation_y[:,1]
+   std_y = np.std(dy)
+
+except:
+    print("No data recored for std_y, using value of 0")
+    std_y = 0
+
+
 #save metrics to the csv file
 d = [['Participant'],
      ['Time taken: ','{0:.2f}'.format(t),' s'],
@@ -580,7 +594,7 @@ d = [['Participant'],
      ['Number of bone hits: ',int(bone_collision_count-1)],
      ['Spinal coord hit: ',spinal_coord_collision_hit],
      ['Maximum exerted force: ',max_force_exerted/10000],
-     ['Deviation inside of tissue: ',record_deviation_y],
+     ['Deviation inside of tissue: ',std_y],
      ['']]
 df = pd.DataFrame(data=d)
 df.to_csv('test_csv.csv',mode='a',header=False,index=False)
