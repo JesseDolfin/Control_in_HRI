@@ -129,7 +129,7 @@ MAX_TISSUE_CORD     = 0.4 #2.4
 MAX_TISSUE_CART     = 5 #
 
 # Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
-simulation_space  = [[350, 600, 300], [0, 600, 600]]
+simulation_space  = [[400, 600, 300], [0, 600, 600]]
 
 # Initialize adjustable scaling factors to play around with tissue size 2 px / mm
 wall_size_factor1 = 0.04      # SKIN , 5.6 mm 
@@ -558,9 +558,35 @@ while run:
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
     
+    # Indicate drop in needle pressure
+    if collision_dict['Cerebrospinal fluid one']:
+        text_font = pygame.font.SysFont('Helvetica Neue', 18)
+        text_surface = text_font.render('Needle pressure is dropping!', False, (0,0,0))
+        screenVR.blit(text_surface, (100, 50))
+
     #toggle a mask over the spine
     if toggle_visual:
-        pygame.draw.rect(screenVR,cVerte,(simulation_space[0][0],0,simulation_space[0][1],simulation_space[1][1]), border_radius = 0)
+        pygame.draw.rect(screenVR,cSkin,(simulation_space[0][0],0,simulation_space[0][1],simulation_space[1][1]), border_radius = 0)
+
+    if i < 350:
+        # # Draw all the vertebrae
+        pygame.draw.rect(screenVR,cWhite,(simulation_space[0][0],0,simulation_space[0][1],simulation_space[1][1]), border_radius = 0)
+
+        pygame.draw.rect(screenVR,cVerte,wall_layer12, border_radius = 4)
+        pygame.draw.rect(screenVR,cVerte,wall_layer13, border_radius = 4)
+        pygame.draw.rect(screenVR,cVerte,wall_layer14, border_radius = 4)
+        pygame.draw.rect(screenVR,cVerte,wall_layer15, border_radius = 4)
+        pygame.draw.rect(screenVR,cVerte,wall_layer16, border_radius = 4)
+        pygame.draw.rect(screenVR,cVerte,wall_layer17, border_radius = 4)
+
+        # Draw all the vertebrae
+        screenVR.blit(vertebrae_layer,(vert_rect1[0],vert_rect1[1])) 
+        screenVR.blit(vertebrae_layer,(vert_rect2[0],vert_rect2[1]))
+        screenVR.blit(vertebrae_layer,(vert_rect3[0],vert_rect3[1]))
+        screenVR.blit(vertebrae_layer,(vert_rect4[0],vert_rect4[1]))
+        screenVR.blit(vertebrae_layer,(vert_rect5[0],vert_rect5[1]))  
+        screenVR.blit(vertebrae_layer,(vert_rect6[0],vert_rect6[1]))
+
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
@@ -580,6 +606,11 @@ while run:
     if spinal_coord_collision:
         GB = min(255, max(0, round(255 * 0.5)))
         window.fill((255, GB, GB), special_flags = pygame.BLEND_MULT)
+
+    if collision_dict['Cerebrospinal fluid one']:
+        GB = min(255, max(0, round(255 * 0.5)))
+        window.fill((GB, 255, GB), special_flags = pygame.BLEND_MULT)
+
 
     pygame.display.flip()   
 
