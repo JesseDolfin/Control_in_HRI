@@ -43,7 +43,7 @@ center = np.array([xc,yc])
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
-FPS = 200   #in Hertz
+FPS = 300   #in Hertz
 
 ## Define colors to be used to render different tissue layers and haptic
 cSkin      = (210,161,140)
@@ -376,7 +376,7 @@ while run:
     Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five','Vertebrae six'}
     for collision in collision_dict:
         if collision not in Bones and collision_dict[collision] == True:
-            
+
             # For the objects(tissues) in collision with the needle tip set the damping value of the environment accordingly
             # Additionally, flip positional and collision boolean
             damping        = K * variable_dict[collision]['D_TISSUE']
@@ -394,7 +394,7 @@ while run:
         pass
     
     # Compute the endpoint force which acts at needle tip
-    fe = (K @ (xm-xh) - (2*0.7*np.sqrt(K) @ dxh)) 
+    fe = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh)) 
    
     #find maximum force exerted
     if i>120:
@@ -507,8 +507,8 @@ while run:
     
     ##Change color based on effort
     colorMaster = (255,\
-         255-np.clip(np.linalg.norm(K_TISSUE*(xm-xh)/window_scale)*15,0,255),\
-         255-np.clip(np.linalg.norm(K_TISSUE*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
+         255-np.clip(np.linalg.norm(np.abs(K_TISSUE)*(xm-xh)/window_scale)*15,0,255),\
+         255-np.clip(np.linalg.norm(np.abs(K_TISSUE)*(xm-xh)/window_scale)*15,0,255)) #if collide else (255, 255, 255)
     
     pygame.draw.line(screenHaptics, (0, 0, 0), (haptic.center),(haptic.center+2*K_TISSUE*(xm-xh)))
     pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
@@ -559,7 +559,7 @@ while run:
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
     
     # Indicate drop in needle pressure
-    if collision_dict['Cerebrospinal fluid one']:
+    if collision_dict['Cerebrospinal fluid one'] and i > 350:
         text_font = pygame.font.SysFont('Helvetica Neue', 18)
         text_surface = text_font.render('Needle pressure is dropping!', False, (0,0,0))
         screenVR.blit(text_surface, (100, 50))

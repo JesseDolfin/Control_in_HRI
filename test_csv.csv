@@ -382,3 +382,539 @@ Spinal coord hit: ,True,
 Maximum exerted force: ,[35.1  9.9],
 Deviation inside of tissue: ,0.3102835103996201,
 ,,
+Participant,,
+Time taken: ,9.10, s
+Distance to fluid: ,153, pixels
+Number of bone hits: ,22,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[17.2  6.3],
+Deviation inside of tissue: ,0.9694120615575458,
+,,
+Participant,,
+Time taken: ,32.43, s
+Distance to fluid: ,-4, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.4 0.7],
+Deviation inside of tissue: ,0.17290433681200212,
+,,
+Participant,,
+Time taken: ,25.17, s
+Distance to fluid: ,101, pixels
+Number of bone hits: ,29,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[3.55 3.55],
+Deviation inside of tissue: ,0.31897133792064286,
+,,
+Participant,,
+Time taken: ,14.77, s
+Distance to fluid: ,96, pixels
+Number of bone hits: ,2,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[ 9.2 24. ],
+Deviation inside of tissue: ,1.9351594667847463,
+,,
+Participant,,
+Time taken: ,28.53, s
+Distance to fluid: ,260, pixels
+Number of bone hits: ,22,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[5.05 5.  ],
+Deviation inside of tissue: ,1.0187246462740762,
+,,
+Participant,,
+Time taken: ,17.11, s
+Distance to fluid: ,207, pixels
+Number of bone hits: ,2,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[3.9 4. ],
+Deviation inside of tissue: ,0.8783509302777663,
+,,
+Participant,,
+Time taken: ,28.84, s
+Distance to fluid: ,148, pixels
+Number of bone hits: ,2,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[9.        3.8312222],
+Deviation inside of tissue: ,0.4797481355167598,
+,,
+Participant,,
+Time taken: ,26.04, s
+Distance to fluid: ,116, pixels
+Number of bone hits: ,3,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[4.15 3.15],
+Deviation inside of tissue: ,0.5825563964359607,
+,,
+Participant,,
+Time taken: ,14.52, s
+Distance to fluid: ,182, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[3.34788123 4.21243409],
+Deviation inside of tissue: ,1.5531309625207579,
+,,
+Participant,,
+Time taken: ,29.05, s
+Distance to fluid: ,57, pixels
+Number of bone hits: ,116,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[5.76160509 4.9       ],
+Deviation inside of tissue: ,0.9142672052028494,
+,,
+Participant,,
+Time taken: ,18.93, s
+Distance to fluid: ,95, pixels
+Number of bone hits: ,37,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[117.73259071 150.39088058],
+Deviation inside of tissue: ,24.89771652487541,
+,,
+Participant,,
+Time taken: ,12.97, s
+Distance to fluid: ,102, pixels
+Number of bone hits: ,18,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[62.50922831 68.56235028],
+Deviation inside of tissue: ,13.656518026773734,
+,,
+Participant,,
+Time taken: ,6.91, s
+Distance to fluid: ,118, pixels
+Number of bone hits: ,13,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[ 83.24603076 241.46227893],
+Deviation inside of tissue: ,30.273933127795445,
+,,
+Participant,,
+Time taken: ,13.38, s
+Distance to fluid: ,105, pixels
+Number of bone hits: ,34,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[22.52345426 36.65418305],
+Deviation inside of tissue: ,8.581580345766966,
+,,
+Participant,,
+Time taken: ,30.70, s
+Distance to fluid: ,0, pixels
+Number of bone hits: ,20,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[1.62228525 4.2       ],
+Deviation inside of tissue: ,0.6186292768055298,
+,,
+Participant,,
+Time taken: ,54.30, s
+Distance to fluid: ,95, pixels
+Number of bone hits: ,174,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[11.85       18.35165419],
+Deviation inside of tissue: ,1.0717287942399947,
+,,
+Participant,,
+Time taken: ,32.10, s
+Distance to fluid: ,105, pixels
+Number of bone hits: ,45,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[ 7.3 18.6],
+Deviation inside of tissue: ,1.4502093888426417,
+,,
+Participant,,
+Time taken: ,22.09, s
+Distance to fluid: ,69, pixels
+Number of bone hits: ,22,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[133.66605772 109.54278584],
+Deviation inside of tissue: ,17.906486685981434,
+,,
+Participant,,
+Time taken: ,19.64, s
+Distance to fluid: ,64, pixels
+Number of bone hits: ,66,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[ 4.9318     26.19536111],
+Deviation inside of tissue: ,2.1485348565757176,
+,,
+Participant,,
+Time taken: ,11.39, s
+Distance to fluid: ,138, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[44.11823577 73.25395251],
+Deviation inside of tissue: ,16.729752976004395,
+,,
+Participant,,
+Time taken: ,17.58, s
+Distance to fluid: ,-171, pixels
+Number of bone hits: ,28,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[53.47484848 53.47484848],
+Deviation inside of tissue: ,8.007701877628461,
+,,
+Participant,,
+Time taken: ,6.32, s
+Distance to fluid: ,108, pixels
+Number of bone hits: ,24,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[119.50789134 130.22214272],
+Deviation inside of tissue: ,19.86933017347441,
+,,
+Participant,,
+Time taken: ,60.01, s
+Distance to fluid: ,68, pixels
+Number of bone hits: ,53,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[14.575      22.25191328],
+Deviation inside of tissue: ,0.7586155234318123,
+,,
+Participant,,
+Time taken: ,7.33, s
+Distance to fluid: ,105, pixels
+Number of bone hits: ,5,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[34.85853569 38.50963558],
+Deviation inside of tissue: ,9.32666631218801,
+,,
+Participant,,
+Time taken: ,13.14, s
+Distance to fluid: ,60, pixels
+Number of bone hits: ,43,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[ 8.6823022  26.04254949],
+Deviation inside of tissue: ,4.778089429503531,
+,,
+Participant,,
+Time taken: ,29.17, s
+Distance to fluid: ,168, pixels
+Number of bone hits: ,39,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[ 5.16171622 23.43126265],
+Deviation inside of tissue: ,1.8123462601694817,
+,,
+Participant,,
+Time taken: ,17.88, s
+Distance to fluid: ,256, pixels
+Number of bone hits: ,26,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[45.4        26.15534011],
+Deviation inside of tissue: ,5.244888793341565,
+,,
+Participant,,
+Time taken: ,35.19, s
+Distance to fluid: ,52, pixels
+Number of bone hits: ,6,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[66.4 25.9],
+Deviation inside of tissue: ,1.5379112313138983,
+,,
+Participant,,
+Time taken: ,7.42, s
+Distance to fluid: ,255, pixels
+Number of bone hits: ,3,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[1.76910157 1.15452063],
+Deviation inside of tissue: ,0.5948161298869612,
+,,
+Participant,,
+Time taken: ,1.85, s
+Distance to fluid: ,84, pixels
+Number of bone hits: ,1,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[0.09342538 4.26507924],
+Deviation inside of tissue: ,1.8359873663440607,
+,,
+Participant,,
+Time taken: ,25.92, s
+Distance to fluid: ,255, pixels
+Number of bone hits: ,16,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[3.73462309 0.73527651],
+Deviation inside of tissue: ,0.48357093619278324,
+,,
+Participant,,
+Time taken: ,33.25, s
+Distance to fluid: ,-1, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.3 2.7],
+Deviation inside of tissue: ,0.18559621337675322,
+,,
+Participant,,
+Time taken: ,34.45, s
+Distance to fluid: ,271, pixels
+Number of bone hits: ,9,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[16.3  3.7],
+Deviation inside of tissue: ,0.435089759285841,
+,,
+Participant,,
+Time taken: ,8.35, s
+Distance to fluid: ,255, pixels
+Number of bone hits: ,5,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[33.2  3.5],
+Deviation inside of tissue: ,0.9886859966642594,
+,,
+Participant,,
+Time taken: ,8.92, s
+Distance to fluid: ,156, pixels
+Number of bone hits: ,4,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[0.12467114 0.47532811],
+Deviation inside of tissue: ,0,
+,,
+Participant,,
+Time taken: ,2.10, s
+Distance to fluid: ,37, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[3.7 9.1],
+Deviation inside of tissue: ,0.0,
+,,
+Participant,,
+Time taken: ,2.12, s
+Distance to fluid: ,255, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[3.78809428e-27 0.00000000e+00],
+Deviation inside of tissue: ,0,
+,,
+Participant,,
+Time taken: ,14.18, s
+Distance to fluid: ,203, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[19.9         1.52765429],
+Deviation inside of tissue: ,0.5204164998665332,
+,,
+Participant,,
+Time taken: ,16.59, s
+Distance to fluid: ,125, pixels
+Number of bone hits: ,7,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[17.2  7.2],
+Deviation inside of tissue: ,0.7195536576626601,
+,,
+Participant,,
+Time taken: ,1.79, s
+Distance to fluid: ,89, pixels
+Number of bone hits: ,8,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[10.6 16.1],
+Deviation inside of tissue: ,3.7468972498841038,
+,,
+Participant,,
+Time taken: ,6.29, s
+Distance to fluid: ,90, pixels
+Number of bone hits: ,7,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[0.00591322 2.39359262],
+Deviation inside of tissue: ,0.5205902102693961,
+,,
+Participant,,
+Time taken: ,4.77, s
+Distance to fluid: ,151, pixels
+Number of bone hits: ,7,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[3.5 6.3],
+Deviation inside of tissue: ,1.5009359166976644,
+,,
+Participant,,
+Time taken: ,37.70, s
+Distance to fluid: ,273, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.3 3.1],
+Deviation inside of tissue: ,0.22586588708739938,
+,,
+Participant,,
+Time taken: ,92.47, s
+Distance to fluid: ,-7, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.5 1.6],
+Deviation inside of tissue: ,0.18384244626926674,
+,,
+Participant,,
+Time taken: ,15.44, s
+Distance to fluid: ,-4, pixels
+Number of bone hits: ,5,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[3.3 4.2],
+Deviation inside of tissue: ,0.3574384671523369,
+,,
+Participant,,
+Time taken: ,13.51, s
+Distance to fluid: ,-5, pixels
+Number of bone hits: ,5,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[17.6 15.2],
+Deviation inside of tissue: ,1.0749623184920505,
+,,
+Participant,,
+Time taken: ,25.49, s
+Distance to fluid: ,-4, pixels
+Number of bone hits: ,8,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[87.5 21.7],
+Deviation inside of tissue: ,0.9135082278380655,
+,,
+Participant,,
+Time taken: ,12.07, s
+Distance to fluid: ,2, pixels
+Number of bone hits: ,3,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.1        0.37248274],
+Deviation inside of tissue: ,0.27320103917544686,
+,,
+Participant,,
+Time taken: ,6.99, s
+Distance to fluid: ,-5, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.1        4.03986612],
+Deviation inside of tissue: ,0.7319072385193999,
+,,
+Participant,,
+Time taken: ,27.95, s
+Distance to fluid: ,-1, pixels
+Number of bone hits: ,3,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.4 1.5],
+Deviation inside of tissue: ,0.24102046350279355,
+,,
+Participant,,
+Time taken: ,31.48, s
+Distance to fluid: ,-5, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[2.7        0.90882871],
+Deviation inside of tissue: ,0.21071380138373097,
+,,
+Participant,,
+Time taken: ,19.96, s
+Distance to fluid: ,105, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[1.4 0.4],
+Deviation inside of tissue: ,0.04677791449057356,
+,,
+Participant,,
+Time taken: ,39.46, s
+Distance to fluid: ,-10, pixels
+Number of bone hits: ,16,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[4.1 5.5],
+Deviation inside of tissue: ,0.40119369862645743,
+,,
+Participant,,
+Time taken: ,71.77, s
+Distance to fluid: ,86, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[2.27414172 6.44759542],
+Deviation inside of tissue: ,0.7124516155190439,
+,,
+Participant,,
+Time taken: ,20.32, s
+Distance to fluid: ,107, pixels
+Number of bone hits: ,37,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[156.17175744  90.143108  ],
+Deviation inside of tissue: ,8.307078380019517,
+,,
+Participant,,
+Time taken: ,8.18, s
+Distance to fluid: ,105, pixels
+Number of bone hits: ,25,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[ 23.8735765  139.96287026],
+Deviation inside of tissue: ,30.556801706519384,
+,,
+Participant,,
+Time taken: ,43.58, s
+Distance to fluid: ,161, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[6.70700649 3.38868123],
+Deviation inside of tissue: ,1.093436679215617,
+,,
+Participant,,
+Time taken: ,52.85, s
+Distance to fluid: ,-8, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[5.22820608 2.19940401],
+Deviation inside of tissue: ,0.6941040298737396,
+,,
+Participant,,
+Time taken: ,30.54, s
+Distance to fluid: ,103, pixels
+Number of bone hits: ,130,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[12.1  0. ],
+Deviation inside of tissue: ,0.0,
+,,
+Participant,,
+Time taken: ,10.57, s
+Distance to fluid: ,-45, pixels
+Number of bone hits: ,-1,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[ 0.         15.02349315],
+Deviation inside of tissue: ,2.5666871516179404,
+,,
+Participant,,
+Time taken: ,23.95, s
+Distance to fluid: ,64, pixels
+Number of bone hits: ,34,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[105.96758421 105.96758421],
+Deviation inside of tissue: ,12.536079721686693,
+,,
+Participant,,
+Time taken: ,22.52, s
+Distance to fluid: ,-14, pixels
+Number of bone hits: ,89,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[25.8 25.8],
+Deviation inside of tissue: ,1.2395822784077317,
+,,
+Participant,,
+Time taken: ,6.87, s
+Distance to fluid: ,-2312, pixels
+Number of bone hits: ,11,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[9.3107 9.3082],
+Deviation inside of tissue: ,0.9230115169319336,
+,,
+Participant,,
+Time taken: ,46.90, s
+Distance to fluid: ,240, pixels
+Number of bone hits: ,10,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[ 7.5  11.05],
+Deviation inside of tissue: ,2.015145559294463,
+,,
+Participant,,
+Time taken: ,23.88, s
+Distance to fluid: ,255, pixels
+Number of bone hits: ,10,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[17.32  8.86],
+Deviation inside of tissue: ,1.2754300306506037,
+,,
+Participant,,
+Time taken: ,105.88, s
+Distance to fluid: ,101, pixels
+Number of bone hits: ,2859,
+Spinal coord hit: ,True,
+Maximum exerted force: ,[47.5 47.5],
+Deviation inside of tissue: ,0.9743925348280255,
+,,
+Participant,,
+Time taken: ,1.41, s
+Distance to fluid: ,43, pixels
+Number of bone hits: ,0,
+Spinal coord hit: ,False,
+Maximum exerted force: ,[27.6  8.7],
+Deviation inside of tissue: ,0.0,
+,,
