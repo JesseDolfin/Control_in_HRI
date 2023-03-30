@@ -15,14 +15,25 @@ def rotMat(angle):
     transformation_matrix = np.array([[np.cos(-angle), np.sin(-angle)],[-np.sin(-angle),  np.cos(-angle)]])
     return transformation_matrix
 
+def compute_line(begin_pos, end_pos):
+    x1 = begin_pos[0]
+    x2 = end_pos[0]
+    y1 = begin_pos[1]
+    y2 = end_pos[1]
+
+    a = (y2-y1)/(x2-x1) #flip gradient due to flipped y
+    b = (y2-a*x2)
+    
+    return a, b
+
 
 ##initialize pygame window
 pygame.init()
-window = pygame.display.set_mode((1200, 400))   ##twice 600x400 for haptic and VR
+window = pygame.display.set_mode((1200, 300))   ##twice 600x400 for haptic and VR
 pygame.display.set_caption('Virtual Haptic Device')
 
-screenHaptics = pygame.Surface((600,400))
-screenVR = pygame.Surface((600,400))
+screenHaptics = pygame.Surface((600,300))
+screenVR = pygame.Surface((600,300))
 
 ##add nice icon from https://www.flaticon.com/authors/vectors-market
 icon = pygame.image.load('robot.png')
@@ -96,7 +107,9 @@ bone_collision_count = 0
 record_deviation_y = []
 xhhold = np.zeros(2)
 spinal_coord_collision_hit = False
-
+update_prox = True
+a = 0
+b = 0
 # Init Virtual env.
 needle_rotation = 0
 alpha = 0
@@ -129,11 +142,11 @@ MAX_TISSUE_CORD     = 0.4 #2.4
 MAX_TISSUE_CART     = 5 #
 
 # Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
-simulation_space  = [[400, 600, 300], [0, 600, 600]]
+simulation_space  = [[400, 600, 300], [0, 300, 700]]
 
 # Initialize adjustable scaling factors to play around with tissue size 2 px / mm
 wall_size_factor1 = 0.04      # SKIN , 5.6 mm 
-wall_size_factor2 = 0.075     # FAT 
+wall_size_factor2 = 0.045     # FAT 
 wall_size_factor3 = 1/150     # SUPRASPINAL LIGAMENT 0.72mm
 wall_size_factor4 = 0.2       # INTERSPINAL LIGAMENT 30 mm
 wall_size_factor5 = 0.03      # LIGAMENTUM FLAVUM 4.5 mm
@@ -193,12 +206,12 @@ variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TIS
 
 
 # Compose the rectangles belonging to every vertebrae
-vert_rect1 = [wall_layer3[0],-0.65*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect2 = [wall_layer3[0],0.25*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect3 = [wall_layer3[0],1.15*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect4 = [wall_layer3[0],2.05*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect5 = [wall_layer3[0],2.95*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
-vert_rect6 = [wall_layer3[0],3.85*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect1 = [wall_layer3[0],-0.7*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect2 = [wall_layer3[0],0.3*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect3 = [wall_layer3[0],1.3*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect4 = [wall_layer3[0],2.3*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect5 = [wall_layer3[0],3.3*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
+vert_rect6 = [wall_layer3[0],4.3*vertebrae_rect[3]+wall_size_factor8*simulation_space[1][2]]
 
 ##################### Detect and Connect Physical device #####################
 # USB serial microcontroller program id data:
@@ -361,11 +374,6 @@ while run:
         if Collision:
             collision_any = True
             collision_dict.update({value: True})
-
-    # Check which values in collision dict are True and update endpoint force and damping factor accordingly to simulate different tissues
-    # Based on SOURCE we will implement a multilayer force displacement model as follows:
-    # ~ Pre-puncture:  R_F = S_f 
-    # ~ Post-puncture: R_F = C_f + F_f
       
     # Compute endpoint velocity and update previous haptic state
     endpoint_velocity = (xhold - xh)/FPS
@@ -395,7 +403,65 @@ while run:
     
     # Compute the endpoint force which acts at needle tip
     fe = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh)) 
-   
+    
+    # Fix the proxy position of needle contact point to skin and update only when no contact is made with any tissue
+    if update_prox and collision_dict['Skin']:
+        begin_pos = (haptic.center[0],haptic.center[1])
+        end_pos   = (haptic.center[0]+np.cos(alpha)*250, haptic.center[1]+ np.sin(alpha)*250)
+        a,b = compute_line(begin_pos, end_pos)
+
+        update_prox = False
+
+    # Enable proxy update as soon as no contact is made with any tissue
+    if all(value == False for value in collision_dict.values()):
+        update_prox = True
+
+    # Compute the distance to a line along the needle which updates as soon as contact with skin is made.
+    if any(value == True for value in collision_dict.values()):
+        
+        distance_from_line = (a*(xm[0]+np.cos(alpha)*250)-1*(xm[1]+ np.sin(alpha)*250) +b)/np.sqrt(a**2+(-1)**2)
+
+        # Tissue stiffness matrix which gives a feedback force depending on how far reference pos for needle is from needle orientation
+        tissue_stiffness_matrix = np.diag([10,1000])
+
+        # Compute the force and scale with respective angle along x and y axis.
+        needle_offset_force = (tissue_stiffness_matrix * distance_from_line)*np.array([np.sin(alpha), np.cos(alpha)])
+
+        # Add the needle_offset_force to the endpoint force 
+        fe += [needle_offset_force[0,0], needle_offset_force[1,1]]  
+
+        # We will use the needle offset force to approximate the normal force exerted on the needle by the tissue layers.
+        # This enables us to implement kinetic friction (note that for every layer passed the kinetic friction increases as the amount of tissues exerting friction increases)
+    
+        if alpha == 0:
+
+            extra_tissue_stiffness_matrix = np.diag([1000,0])
+
+            kinetic_friction_coefficient = 0.46
+
+            tissue_normal_force_x = np.abs((extra_tissue_stiffness_matrix * distance_from_line))[1,1]
+            tissue_normal_force_y = np.abs((extra_tissue_stiffness_matrix * distance_from_line))[0,0]
+            
+            # Note that the kinetic friction is based on normal force so F_x = mu_kinetic * Fn_y and F_y = mu_kinetic * Fn_x
+            frictional_force = tissue_normal_force_x*kinetic_friction_coefficient
+            fe[0] += -frictional_force
+            
+        elif alpha !=0:
+            extra_tissue_stiffness_matrix = np.diag([1000,1000])
+            kinetic_friction_coefficient = 0.46
+            
+            tissue_normal_force = (extra_tissue_stiffness_matrix * distance_from_line)*np.array([np.cos(alpha), np.sin(alpha)])
+            
+        
+            # Note that the kinetic friction is based on normal force so F_x = mu_kinetic * Fn_y and F_y = mu_kinetic * Fn_x
+            frictional_force = kinetic_friction_coefficient*tissue_normal_force
+
+            fe[0] += frictional_force[0,0]
+            fe[1] += frictional_force[1,1]
+
+    # Now that we have the normal force exerted by the tissue we can start implementing kinetic friction
+    
+
     #find maximum force exerted
     if i>120:
         if fe[0] > max_force_exerted[0]:
@@ -403,9 +469,9 @@ while run:
         if fe[1] > max_force_exerted[1]:
             max_force_exerted[1] = fe[1]
 
-    #print("xm:",xm,"xh:",xh,"fe:",fe,"dxh:",dxh)
     # Compute damping force
     fd = -damping @ endpoint_velocity 
+    
 
     
     ######### Send computed forces to the device #########
@@ -421,7 +487,7 @@ while run:
         ddxh = fe 
      
         #update velocity to accomodate damping
-        dxh += ddxh*dt - fd
+        dxh += ddxh*dt -fd
 
         # In case collision occurs with vertebrae simulate an infinitely stiff bone
         if collision_bone and away_from_bone:
@@ -552,12 +618,15 @@ while run:
     screenVR.blit(vertebrae_layer,(vert_rect4[0],vert_rect4[1]))
     screenVR.blit(vertebrae_layer,(vert_rect5[0],vert_rect5[1]))  
     screenVR.blit(vertebrae_layer,(vert_rect6[0],vert_rect6[1]))
-
+    
     # Draw needle 
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.cos(alpha)*250, haptic.center[1]+ np.sin(alpha)*250), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]+np.sin(-alpha)*25, haptic.center[1]+ np.cos(-alpha)*25), 2 )
     pygame.draw.line(screenVR, cOrange, (haptic.center[0],haptic.center[1]), (haptic.center[0]-np.sin(-alpha)*25, haptic.center[1]- np.cos(-alpha)*25), 2 )
     
+    
+ 
+
     # Indicate drop in needle pressure
     if collision_dict['Cerebrospinal fluid one'] and i > 350:
         text_font = pygame.font.SysFont('Helvetica Neue', 18)
@@ -586,7 +655,6 @@ while run:
         screenVR.blit(vertebrae_layer,(vert_rect4[0],vert_rect4[1]))
         screenVR.blit(vertebrae_layer,(vert_rect5[0],vert_rect5[1]))  
         screenVR.blit(vertebrae_layer,(vert_rect6[0],vert_rect6[1]))
-
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
@@ -634,7 +702,7 @@ except:
 #save metrics to the csv file
 d = [['Participant'],
      ['Time taken: ','{0:.2f}'.format(t),' s'],
-     ['Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0]),' pixels'],
+     ['Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0])*2,' mm'],
      ['Number of bone hits: ',int(bone_collision_count-1)],
      ['Spinal coord hit: ',spinal_coord_collision_hit],
      ['Maximum exerted force: ',max_force_exerted/10000],
