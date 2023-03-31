@@ -120,6 +120,7 @@ debugToggle = True
 away_from_bone = True
 spinal_coord_collision = False
 toggle_visual = True
+haptic_feedback = True
    
 # Set all environment parameters to simulate damping in the various tissue layers
 D_TISSUE_SKIN   = 14.4 # dens = 1.1kg/L
@@ -298,6 +299,9 @@ while run:
             # Toggle between visual feedback or not
             if event.key ==ord('v'):
                 toggle_visual = not toggle_visual
+            
+            if event.key ==ord('h'):
+                haptic_feedback = not haptic_feedback
                 
 
 
@@ -484,66 +488,70 @@ while run:
         #pause for 1 millisecond
         time.sleep(0.001)
     else: 
-        ddxh = fe 
-     
-        #update velocity to accomodate damping
-        dxh += ddxh*dt -fd
+        if haptic_feedback:
+            ddxh = fe 
+        
+            #update velocity to accomodate damping
+            dxh += ddxh*dt -fd
 
-        # In case collision occurs with vertebrae simulate an infinitely stiff bone
-        if collision_bone and away_from_bone:
-            phold = xh
-            away_from_bone = False
-            bone_collision_count += 0.5
+            # In case collision occurs with vertebrae simulate an infinitely stiff bone
+            if collision_bone and away_from_bone:
+                phold = xh
+                away_from_bone = False
+                bone_collision_count += 0.5
 
-        if reference_pos[0] >= phold[0] and not away_from_bone:
-            dxh = np.zeros(2)
-        else: 
-            away_from_bone =  True
+            if reference_pos[0] >= phold[0] and not away_from_bone:
+                dxh = np.zeros(2)
+            else: 
+                away_from_bone =  True
 
-        # Loop over the detected collisions dictonary (excluding vertebrae), in case collision is detected retrieve tissue parameters from parameter dict
-        Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five', 'Vertebrae six'}
-        for collision in collision_dict:
-            if collision not in Bones and collision_dict[collision] == True:
-                # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
-                max_tissue_force = variable_dict[collision]['max_tissue_force']
-                #print("Max tissue force: ", max_tissue_force)
-                if collision == 'Spinal cord' and i>120:
-                    spinal_coord_collision_hit = True
-                    spinal_coord_collision = True
-                else:
-                    spinal_coord_collision = False
-                # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
-                if update_bool and i>120:
-                    phold = xh
-                    variable_dict[collision]['update_bool'] = False
+            # Loop over the detected collisions dictonary (excluding vertebrae), in case collision is detected retrieve tissue parameters from parameter dict
+            Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five', 'Vertebrae six'}
+            for collision in collision_dict:
+                if collision not in Bones and collision_dict[collision] == True:
+                    # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
+                    max_tissue_force = variable_dict[collision]['max_tissue_force']
+                    #print("Max tissue force: ", max_tissue_force)
+                    if collision == 'Spinal cord' and i>120:
+                        spinal_coord_collision_hit = True
+                        spinal_coord_collision = True
+                    else:
+                        spinal_coord_collision = False
+                    # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
+                    if update_bool and i>120:
+                        phold = xh
+                        variable_dict[collision]['update_bool'] = False
 
-                #find standard deviation
-                if i>120:
-                    dev = np.abs(xh - xhhold)
-                    dx = dev[0]
-                    dy = dev[1]
+                    #find standard deviation
+                    if i>120:
+                        dev = np.abs(xh - xhhold)
+                        dx = dev[0]
+                        dy = dev[1]
 
-                    dx *= math.sin(-alpha)
-                    dy *= math.cos(-alpha)
-             
-                    record_deviation_y.append([dx,dy])
-
-                penetration_bool = variable_dict[collision]['penetration_bool']
-
-                # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
-                if not penetration_bool:
-                    F_pen = (reference_pos[0]-phold[0])*0.1*math.cos(alpha)
-                else:
-                    F_pen = 0
+                        dx *= math.sin(-alpha)
+                        dy *= math.cos(-alpha)
                 
-                if F_pen > max_tissue_force:
-                    variable_dict[collision]['penetration_bool'] = True
-                    penetration_bool = True
-            
-                if xh[0] > reference_pos[0]:
-                    pass
-                elif not penetration_bool:
-                    dxh = np.zeros(2)
+                        record_deviation_y.append([dx,dy])
+
+                    penetration_bool = variable_dict[collision]['penetration_bool']
+
+                    # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
+                    if not penetration_bool:
+                        F_pen = (reference_pos[0]-phold[0])*0.1*math.cos(alpha)
+                    else:
+                        F_pen = 0
+                    
+                    if F_pen > max_tissue_force:
+                        variable_dict[collision]['penetration_bool'] = True
+                        penetration_bool = True
+                
+                    if xh[0] > reference_pos[0]:
+                        pass
+                    elif not penetration_bool:
+                        dxh = np.zeros(2)
+        else:
+            ddxh = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh)) 
+            dxh += ddxh*dt
 
                 
                 
@@ -626,12 +634,12 @@ while run:
     
     
  
-
-    # Indicate drop in needle pressure
-    if collision_dict['Cerebrospinal fluid one'] and i > 350:
-        text_font = pygame.font.SysFont('Helvetica Neue', 18)
-        text_surface = text_font.render('Needle pressure is dropping!', False, (0,0,0))
-        screenVR.blit(text_surface, (100, 50))
+    if haptic_feedback:
+        # Indicate drop in needle pressure
+        if collision_dict['Cerebrospinal fluid one'] and i > 350:
+            text_font = pygame.font.SysFont('Helvetica Neue', 18)
+            text_surface = text_font.render('Needle pressure is dropping!', False, (0,0,0))
+            screenVR.blit(text_surface, (100, 50))
 
     #toggle a mask over the spine
     if toggle_visual:
@@ -670,14 +678,15 @@ while run:
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
 
+    if haptic_feedback:
+        if collision_dict['Spinal cord']:
+            spinal_coord_collision_hit = True
+            GB = min(255, max(0, round(255 * 0.5)))
+            window.fill((255, GB, GB), special_flags = pygame.BLEND_MULT)
 
-    if spinal_coord_collision:
-        GB = min(255, max(0, round(255 * 0.5)))
-        window.fill((255, GB, GB), special_flags = pygame.BLEND_MULT)
-
-    if collision_dict['Cerebrospinal fluid one']:
-        GB = min(255, max(0, round(255 * 0.5)))
-        window.fill((GB, 255, GB), special_flags = pygame.BLEND_MULT)
+        if collision_dict['Cerebrospinal fluid one']:
+            GB = min(255, max(0, round(255 * 0.5)))
+            window.fill((GB, 255, GB), special_flags = pygame.BLEND_MULT)
 
 
     pygame.display.flip()   
@@ -698,7 +707,6 @@ except:
     print("No data recored for std_y, using value of 0")
     std_y = 0
 
-
 #save metrics to the csv file
 d = [['Participant'],
      ['Time taken: ','{0:.2f}'.format(t),' s'],
@@ -708,5 +716,6 @@ d = [['Participant'],
      ['Maximum exerted force: ',max_force_exerted/10000],
      ['Deviation inside of tissue: ',std_y],
      ['']]
+
 df = pd.DataFrame(data=d)
 df.to_csv('test_csv.csv',mode='a',header=False,index=False)
