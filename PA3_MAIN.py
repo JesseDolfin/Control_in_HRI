@@ -40,7 +40,7 @@ icon = pygame.image.load('robot.png')
 pygame.display.set_icon(icon)
 
 ##add text on top to debugToggle the timing and forces
-font = pygame.font.Font('freesansbold.ttf', 18)
+font = pygame.font.Font('freesansbold.ttf', 14)
 
 pygame.mouse.set_visible(True)     ##Hide cursor by default. 'm' toggles it
  
@@ -121,6 +121,8 @@ away_from_bone = True
 spinal_coord_collision = False
 toggle_visual = True
 haptic_feedback = True
+
+proceed = False
    
 # Set all environment parameters to simulate damping in the various tissue layers
 D_TISSUE_SKIN   = 14.4 # dens = 1.1kg/L
@@ -271,6 +273,43 @@ window_scale = 3
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
 
+proceed = False
+run = True
+while run:
+    for event in pygame.event.get(): # interrupt function
+        if event.type == pygame.KEYUP:
+            if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
+                run = False
+            if event.key == ord('e') and not proceed:
+                proceed = not proceed
+
+    # Create black canvas to which text can be written
+    window.blit(screenHaptics, (0,0))
+    window.blit(screenVR, (600,0))
+
+    if not proceed:
+        # Create text to be displayed
+        text_image   = pygame.image.load("intro.png")
+        
+        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+        intro_image  = pygame.transform.scale(intro_image,(600,300))
+        screenHaptics.blit(text_image,(0,0)) 
+        screenVR.blit(intro_image,(0,0)) 
+
+        pygame.display.flip()  
+    elif proceed:
+        text_image   = pygame.image.load("intro_2.png")
+        
+        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+        intro_image  = pygame.transform.scale(intro_image,(600,300))
+        screenHaptics.blit(text_image,(0,0)) 
+        screenVR.blit(intro_image,(0,0)) 
+
+        pygame.display.flip()  
+
+    
+    
+    
 
 run = True
 while run:
@@ -280,6 +319,7 @@ while run:
     penetration = True
     collision_bone = False
     collision_any = False
+
     #########Process events  (Mouse, Keyboard etc...)#########
     for event in pygame.event.get():
         ##If the window is close then quit 
@@ -300,14 +340,14 @@ while run:
                 alpha -= np.deg2rad(5)
 
             # Toggle between visual feedback or not
-            if event.key ==ord('v'):
+            if event.key == ord('v'):
                 toggle_visual = not toggle_visual
             
-            if event.key ==ord('h'):
+            if event.key == ord('h'):
                 haptic_feedback = not haptic_feedback
+            if event.key == ord('p'):
+                proceed = not proceed
                 
-
-
     ######### Read position (Haply and/or Mouse)  #########
     ##Get endpoint position xh
     if port and haplyBoard.data_available():    ##If Haply is present
@@ -629,10 +669,10 @@ while run:
  
     if haptic_feedback:
         # Indicate drop in needle pressure
+        
         if collision_dict['Cerebrospinal fluid one'] and i > 350:
-            text_font = pygame.font.SysFont('Helvetica Neue', 18)
-            text_surface = text_font.render('Needle pressure is dropping!', False, (0,0,0))
-            screenVR.blit(text_surface, (100, 50))
+            text_surface = font.render('Needle pressure is dropping!', False, (0,0,0))
+            screenVR.blit(text_surface, (0, 75))
 
     #toggle a mask over the spine
     if toggle_visual:
@@ -656,6 +696,15 @@ while run:
         screenVR.blit(vertebrae_layer,(vert_rect4[0],vert_rect4[1]))
         screenVR.blit(vertebrae_layer,(vert_rect5[0],vert_rect5[1]))  
         screenVR.blit(vertebrae_layer,(vert_rect6[0],vert_rect6[1]))
+    
+    # Visualize toggles on display
+    text_surface1 = font.render("Press 'e' to rotate needle up", True, (0, 0, 0),(255, 255, 255))
+    text_surface2 = font.render("Press 'r' to rotate needle down", True,(0, 0, 0), (255, 255, 255))
+    text_surface3 = font.render("Press 'q' for epidural space", True, (0, 0, 0), (255, 255, 255))
+
+    screenVR.blit(text_surface1, (0, 0))
+    screenVR.blit(text_surface2, (0, 20))
+    screenVR.blit(text_surface3, (0, 40))
 
     ##Fuse it back together
     window.blit(screenHaptics, (0,0))
@@ -681,7 +730,7 @@ while run:
             GB = min(255, max(0, round(255 * 0.5)))
             window.fill((GB, 255, GB), special_flags = pygame.BLEND_MULT)
 
-
+    
     pygame.display.flip()   
 
     ##Slow down the loop to match FPS
