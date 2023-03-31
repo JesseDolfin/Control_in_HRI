@@ -424,6 +424,7 @@ while run:
     if any(value == True for value in collision_dict.values()):
         
         distance_from_line = (a*(xm[0]+np.cos(alpha)*250)-1*(xm[1]+ np.sin(alpha)*250) +b)/np.sqrt(a**2+(-1)**2)
+        record_deviation_y.append(distance_from_line)
 
         # Tissue stiffness matrix which gives a feedback force depending on how far reference pos for needle is from needle orientation
         tissue_stiffness_matrix = np.diag([10,1000])
@@ -521,17 +522,6 @@ while run:
                     if update_bool and i>120:
                         phold = xh
                         variable_dict[collision]['update_bool'] = False
-
-                    #find standard deviation
-                    if i>120:
-                        dev = np.abs(xh - xhhold)
-                        dx = dev[0]
-                        dy = dev[1]
-
-                        dx *= math.sin(-alpha)
-                        dy *= math.cos(-alpha)
-                
-                        record_deviation_y.append([dx,dy])
 
                     penetration_bool = variable_dict[collision]['penetration_bool']
 
@@ -698,20 +688,14 @@ pygame.display.quit()
 pygame.quit()
 
 record_deviation_y = np.array(record_deviation_y)
-
-try:
-   dy = record_deviation_y[:,1]
-   std_y = np.std(dy)
-
-except:
-    print("No data recored for std_y, using value of 0")
-    std_y = 0
+std_y = np.std(record_deviation_y)
 
 #save metrics to the csv file
 d = [['Participant'],
+     ['Haptic feedback: ', haptic_feedback],
      ['Time taken: ','{0:.2f}'.format(t),' s'],
      ['Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0])*2,' mm'],
-     ['Number of bone hits: ',int(bone_collision_count-1)],
+     ['Number of bone hits: ',int(bone_collision_count)],
      ['Spinal coord hit: ',spinal_coord_collision_hit],
      ['Maximum exerted force: ',max_force_exerted/10000],
      ['Deviation inside of tissue: ',std_y],
