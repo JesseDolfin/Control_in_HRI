@@ -274,6 +274,9 @@ window_scale = 3
 
 run = True
 while run:
+    if collision_dict['Spinal cord']:
+        time.sleep(1.5)
+        run = False
     penetration = True
     collision_bone = False
     collision_any = False
