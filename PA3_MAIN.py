@@ -287,39 +287,39 @@ window_scale = 3
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
 
-# proceed = False
-# run = True
-# while run:
-#     for event in pygame.event.get(): # interrupt function
-#         if event.type == pygame.KEYUP:
-#             if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
-#                 run = False
-#             if event.key == ord('e') and not proceed:
-#                 proceed = not proceed
+proceed = False
+run = True
+while run:
+    for event in pygame.event.get(): # interrupt function
+        if event.type == pygame.KEYUP:
+            if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
+                run = False
+            if event.key == ord('e') and not proceed:
+                proceed = not proceed
 
-#     # Create black canvas to which text can be written
-#     window.blit(screenHaptics, (0,0))
-#     window.blit(screenVR, (600,0))
+    # Create black canvas to which text can be written
+    window.blit(screenHaptics, (0,0))
+    window.blit(screenVR, (600,0))
 
-#     if not proceed:
-#         # Create text to be displayed
-#         text_image   = pygame.image.load("intro.png")
+    if not proceed:
+        # Create text to be displayed
+        text_image   = pygame.image.load("intro.png")
         
-#         intro_image  = pygame.image.load("intro_image.png").convert_alpha()
-#         intro_image  = pygame.transform.scale(intro_image,(600,300))
-#         screenHaptics.blit(text_image,(0,0)) 
-#         screenVR.blit(intro_image,(0,0)) 
+        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+        intro_image  = pygame.transform.scale(intro_image,(600,300))
+        screenHaptics.blit(text_image,(0,0)) 
+        screenVR.blit(intro_image,(0,0)) 
 
-#         pygame.display.flip()  
-#     elif proceed:
-#         text_image   = pygame.image.load("intro_2.png")
+        pygame.display.flip()  
+    elif proceed:
+        text_image   = pygame.image.load("intro_2.png")
         
-#         intro_image  = pygame.image.load("intro_image.png").convert_alpha()
-#         intro_image  = pygame.transform.scale(intro_image,(600,300))
-#         screenHaptics.blit(text_image,(0,0)) 
-#         screenVR.blit(intro_image,(0,0)) 
+        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+        intro_image  = pygame.transform.scale(intro_image,(600,300))
+        screenHaptics.blit(text_image,(0,0)) 
+        screenVR.blit(intro_image,(0,0)) 
 
-#         pygame.display.flip()  
+        pygame.display.flip()  
 
     
 
