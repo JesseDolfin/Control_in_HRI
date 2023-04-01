@@ -54,7 +54,7 @@ center = np.array([xc,yc])
 
 ##initialize "real-time" clock
 clock = pygame.time.Clock()
-FPS = 300   #in Hertz
+FPS = 400   #in Hertz
 
 ## Define colors to be used to render different tissue layers and haptic
 cSkin      = (210,161,140)
@@ -97,6 +97,8 @@ phold = np.zeros(2)
 
 damping = np.zeros(2)
 K = np.diag([1000,1000]) # stiffness matrix N/m
+kinetic_friction_coefficient = 0.1
+
 dt = 0.01 # intergration step timedt = 0.01 # integration step time
 i = 0 # loop counter
 t = 0 # time
@@ -110,9 +112,11 @@ spinal_coord_collision_hit = False
 update_prox = True
 a = 0
 b = 0
+
 # Init Virtual env.
 needle_rotation = 0
 alpha = 0
+tissue_index = 0
 
 # Declare some simulation booleans to switch between states
 robotToggle = True
@@ -121,10 +125,10 @@ away_from_bone = True
 spinal_coord_collision = False
 toggle_visual = True
 haptic_feedback = True
-
 proceed = False
    
 # Set all environment parameters to simulate damping in the various tissue layers
+# Damping values are relative to each other based on tissue density
 D_TISSUE_SKIN   = 14.4 # dens = 1.1kg/L
 D_TISSUE_FAT    = 11.8 # dens = 0.9kg/L
 D_TISSUE_SUPRA  = 15   # dens = 1.142kg/L
@@ -134,15 +138,25 @@ D_TISSUE_FLUID  = 13.2 # dens = 1.007kg/L
 D_TISSUE_CORD   = 14   # dens = 1.075/L
 D_TISSUE_CART   = 14.4 # dens = 1.1kg/L
 
-#  Set all environment parameters to simulate damping in the various tissue layers
-MAX_TISSUE_SKIN     = 1 #6.037
-MAX_TISSUE_FAT      = 0.36 #2.2
-MAX_TISSUE_SUPRA    = 1.49 #9
-MAX_TISSUE_INTER    = 1.24 #7.5
-MAX_TISSUE_FLAVUM   = 2 #12.1
-MAX_TISSUE_FLUID    = 0.4 #2.4
-MAX_TISSUE_CORD     = 0.4 #2.4
-MAX_TISSUE_CART     = 5 #
+#  Set all environment parameters to simulate elastic stiffness force upon contact in the various tissue layers
+MAX_TISSUE_SKIN     = 6.0  #1 #6.037
+MAX_TISSUE_FAT      = 2.2  #0.36 #2.2
+MAX_TISSUE_SUPRA    = 9.0  #1.49 #9
+MAX_TISSUE_INTER    = 7.5  #1.24 #7.5
+MAX_TISSUE_FLAVUM   = 12.1 #12.1
+MAX_TISSUE_FLUID    = 2.4  #0.4 #2.4
+MAX_TISSUE_CORD     = 2.4  #0.4 #2.4
+MAX_TISSUE_CART     = 50.0 #5 #
+
+#  Set all environment parameters to simulate tissue cutting force upon traversing the various tissue layers
+CUTTING_FORCE_SKIN   = 6037
+CUTTING_FORCE_FAT    = 2200
+CUTTING_FORCE_SUPRA  = 9000
+CUTTING_FORCE_INTER  = 7500
+CUTTING_FORCE_FLAVUM = 12100
+CUTTING_FORCE_FLUID  = 2400
+CUTTING_FORCE_CORD   = 2400
+CUTTING_FORCE_CART   = 50000
 
 # Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
 simulation_space  = [[400, 600, 300], [0, 300, 700]]
@@ -195,17 +209,17 @@ collision_dict = {'Skin': False, 'Fat': False, 'Supraspinal ligament one': False
                     'Vertebrae three': False, 'Vertebrae four': False, 'Vertebrae five': False,'Vertebrae six':False}
 
 # Initialize a dictonary which holds all the simulation parameters for efficiency
-variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TISSUE_SKIN, 'collision_bool': True, 'update_bool': True, 'penetration_bool': False},
-                    'Fat' : {'D_TISSUE': D_TISSUE_FAT,'max_tissue_force': MAX_TISSUE_FAT, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Supraspinal ligament one': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Interspinal ligament': {'D_TISSUE': D_TISSUE_INTER,'max_tissue_force': MAX_TISSUE_INTER, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Ligamentum flavum': {'D_TISSUE': D_TISSUE_FLAVUM,'max_tissue_force': MAX_TISSUE_FLAVUM, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Cerebrospinal fluid one': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Spinal cord': {'D_TISSUE': D_TISSUE_CORD,'max_tissue_force': MAX_TISSUE_CORD, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Cerebrospinal fluid two': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID , 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Supraspinal ligament two': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Cartilage': {'D_TISSUE': D_TISSUE_CART,'max_tissue_force': MAX_TISSUE_CART, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
-                    'Supraspinal ligament three': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False}}
+variable_dict = {'Skin': {'D_TISSUE': D_TISSUE_SKIN, 'max_tissue_force': MAX_TISSUE_SKIN,'tissue_cutting_force': CUTTING_FORCE_SKIN, 'collision_bool': True, 'update_bool': True, 'penetration_bool': False},
+                    'Fat' : {'D_TISSUE': D_TISSUE_FAT,'max_tissue_force': MAX_TISSUE_FAT,'tissue_cutting_force': CUTTING_FORCE_FAT, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Supraspinal ligament one': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA,'tissue_cutting_force': CUTTING_FORCE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Interspinal ligament': {'D_TISSUE': D_TISSUE_INTER,'max_tissue_force': MAX_TISSUE_INTER,'tissue_cutting_force': CUTTING_FORCE_INTER, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Ligamentum flavum': {'D_TISSUE': D_TISSUE_FLAVUM,'max_tissue_force': MAX_TISSUE_FLAVUM,'tissue_cutting_force': CUTTING_FORCE_FLAVUM, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Cerebrospinal fluid one': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID,'tissue_cutting_force': CUTTING_FORCE_FLUID, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Spinal cord': {'D_TISSUE': D_TISSUE_CORD,'max_tissue_force': MAX_TISSUE_CORD,'tissue_cutting_force': CUTTING_FORCE_CORD, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Cerebrospinal fluid two': {'D_TISSUE': D_TISSUE_FLUID,'max_tissue_force': MAX_TISSUE_FLUID ,'tissue_cutting_force': CUTTING_FORCE_FLUID, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Supraspinal ligament two': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA,'tissue_cutting_force': CUTTING_FORCE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Cartilage': {'D_TISSUE': D_TISSUE_CART,'max_tissue_force': MAX_TISSUE_CART,'tissue_cutting_force': CUTTING_FORCE_CART, 'collision_bool': True, 'update_bool': True,'penetration_bool': False},
+                    'Supraspinal ligament three': {'D_TISSUE': D_TISSUE_SUPRA,'max_tissue_force': MAX_TISSUE_SUPRA,'tissue_cutting_force': CUTTING_FORCE_SUPRA, 'collision_bool': True, 'update_bool': True,'penetration_bool': False}}
 
 
 # Compose the rectangles belonging to every vertebrae
@@ -273,54 +287,56 @@ window_scale = 3
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
 
-proceed = False
+# proceed = False
+# run = True
+# while run:
+#     for event in pygame.event.get(): # interrupt function
+#         if event.type == pygame.KEYUP:
+#             if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
+#                 run = False
+#             if event.key == ord('e') and not proceed:
+#                 proceed = not proceed
+
+#     # Create black canvas to which text can be written
+#     window.blit(screenHaptics, (0,0))
+#     window.blit(screenVR, (600,0))
+
+#     if not proceed:
+#         # Create text to be displayed
+#         text_image   = pygame.image.load("intro.png")
+        
+#         intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+#         intro_image  = pygame.transform.scale(intro_image,(600,300))
+#         screenHaptics.blit(text_image,(0,0)) 
+#         screenVR.blit(intro_image,(0,0)) 
+
+#         pygame.display.flip()  
+#     elif proceed:
+#         text_image   = pygame.image.load("intro_2.png")
+        
+#         intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+#         intro_image  = pygame.transform.scale(intro_image,(600,300))
+#         screenHaptics.blit(text_image,(0,0)) 
+#         screenVR.blit(intro_image,(0,0)) 
+
+#         pygame.display.flip()  
+
+    
+
 run = True
 while run:
-    for event in pygame.event.get(): # interrupt function
-        if event.type == pygame.KEYUP:
-            if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
-                run = False
-            if event.key == ord('e') and not proceed:
-                proceed = not proceed
 
-    # Create black canvas to which text can be written
-    window.blit(screenHaptics, (0,0))
-    window.blit(screenVR, (600,0))
-
-    if not proceed:
-        # Create text to be displayed
-        text_image   = pygame.image.load("intro.png")
-        
-        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
-        intro_image  = pygame.transform.scale(intro_image,(600,300))
-        screenHaptics.blit(text_image,(0,0)) 
-        screenVR.blit(intro_image,(0,0)) 
-
-        pygame.display.flip()  
-    elif proceed:
-        text_image   = pygame.image.load("intro_2.png")
-        
-        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
-        intro_image  = pygame.transform.scale(intro_image,(600,300))
-        screenHaptics.blit(text_image,(0,0)) 
-        screenVR.blit(intro_image,(0,0)) 
-
-        pygame.display.flip()  
-
-    
-    
-    
-
-run = True
-while run:
+    # Initialize that simulation ends as soon as spinal coord is hit. 
     if collision_dict['Spinal cord']:
         time.sleep(1.5)
         run = False
-    penetration = True
-    collision_bone = False
-    collision_any = False
 
-    #########Process events  (Mouse, Keyboard etc...)#########
+    # Set some booleans
+    penetration    = True
+    collision_bone = False
+    collision_any  = False
+
+    ########################################  Process events  (Mouse, Keyboard etc...) ########################################
     for event in pygame.event.get():
         ##If the window is close then quit 
         if event.type == pygame.QUIT:
@@ -348,7 +364,8 @@ while run:
             if event.key == ord('p'):
                 proceed = not proceed
                 
-    ######### Read position (Haply and/or Mouse)  #########
+    ######################################## Read position (Haply and/or Mouse)  ########################################
+    
     ##Get endpoint position xh
     if port and haplyBoard.data_available():    ##If Haply is present
         #Waiting for the device to be available
@@ -371,7 +388,8 @@ while run:
         cursor = pygame.mouse.get_pos()
         xm = np.array(cursor) 
     
-    ########### COMPUTE COLLISIONS AND PRINT WHICH TYPE OF COLLISION TO CONSOLE ###########
+    ######################################## COMPUTE COLLISIONS WITH ANY TISSUE ########################################
+    
     # Define haptic center and endpoint of our haptic (needle tip)
     haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*250,haptic.center[1]+np.sin(alpha)*250, 1, 1)
     
@@ -379,7 +397,6 @@ while run:
     haptic_endpoint_mask = pygame.mask.Mask((haptic_endpoint.width, haptic_endpoint.height))
     haptic_endpoint_mask.fill()
 
- 
     # Compute offset between haptic endpoint and every vertebrae mask
     xoffset1 = vert_rect1[0] - haptic_endpoint[0]
     yoffset1 = vert_rect1[1] - haptic_endpoint[1]
@@ -403,8 +420,6 @@ while run:
     if vert1_collision or vert2_collision or vert3_collision or vert4_collision or vert5_collision:
         collision_bone = True
 
-    ########## COMPUTE ENDPOINT FORCE FEEDBACK ##########
-
     # Initialize zero endpoint force and reference position based on cursor or Haply
     fe = np.zeros(2)
     reference_pos  = cursor
@@ -421,26 +436,30 @@ while run:
         if Collision:
             collision_any = True
             collision_dict.update({value: True})
-      
-    # Compute endpoint velocity and update previous haptic state
-    endpoint_velocity = (xhold - xh)/FPS
-    xhold = xh
-   
+         
+    ######################################## UPDATE ENVIRONMENT PARAMETERS BASED ON COLLISIONS ########################################
+
     # Loop over all the rectangular objects and check for collision, note that we exclude the vertebrae from the loop
     # The reason being that these are modelled infinitely stiff so they don't need damping etc.
+    
     Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five','Vertebrae six'}
     for collision in collision_dict:
         if collision not in Bones and collision_dict[collision] == True:
 
-            # For the objects(tissues) in collision with the needle tip set the damping value of the environment accordingly
-            # Additionally, flip positional and collision boolean
-            damping        = K * variable_dict[collision]['D_TISSUE']
+            # For the objects(tissues) in collision with the needle tip set the damping value and tissue cuttin force of the environment accordingly
+            # Additionally, flip position, collision boolean and tissue layer index.
+            
+            damping        = variable_dict[collision]['D_TISSUE'] * K
+            cutting_force  = variable_dict[collision]['tissue_cutting_force']
             collision_bool = variable_dict[collision]['collision_bool']
             update_bool    = variable_dict[collision]['update_bool']
+            tissue_index   = list(variable_dict).index(collision) + 1  #We start counting index at zero so +1 for further computation
     
-    # In case no collisions are detected default the damping value of the environment to zero
+    
+    # In case no collisions are detected default the damping value and tissue cutting force of the environment to zero
     if all(value == False for value in collision_dict.values()):
-        damping = np.zeros(2)
+        damping          = np.zeros(2)
+        cutting_force    = 0
     
     # Check if any of the rectangular vertebrae are in collision, if so flip bone collision boolean to limit needle movement
     if collision_dict['Vertebrae one'] or collision_dict['Vertebrae two'] or collision_dict['Vertebrae three'] or collision_dict['Vertebrae four'] or collision_dict['Vertebrae five'] or collision_dict['Vertebrae six']:
@@ -448,10 +467,16 @@ while run:
     else:
         pass
     
-    # Compute the endpoint force which acts at needle tip
-    fe = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh)) 
+    ######################################## FORCE FEEDBACK COMPUTATIONS + IMPEDANCE CONTROL ########################################
+ 
+    # Calculate endpoint velocity and update previous haptic state
+    endpoint_velocity = (xhold - xh)/FPS
+    xhold = xh
+
+    # Calculate force feedback from impedance controller 
+    fe = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh))
     
-    # Fix the proxy position of needle contact point to skin and update only when no contact is made with any tissue
+    # Fix the proxy position of needle contact point with skin and update only when no contact is made with any tissue (so when needle is retracted)
     if update_prox and collision_dict['Skin']:
         begin_pos = (haptic.center[0],haptic.center[1])
         end_pos   = (haptic.center[0]+np.cos(alpha)*250, haptic.center[1]+ np.sin(alpha)*250)
@@ -459,70 +484,74 @@ while run:
 
         update_prox = False
 
-    # Enable proxy update as soon as no contact is made with any tissue
+    # Enable needle proxy position update as soon as no contact is made with any tissue (so when needle is retracted)
     if all(value == False for value in collision_dict.values()):
         update_prox = True
 
-    # Compute the distance to a line along the needle which updates as soon as contact with skin is made.
+    # If collision exists with any tissue layer create a virtual needle path along the needle
+    # to compute tissues normal force acting on needle when moving inside tissue 
     if any(value == True for value in collision_dict.values()):
         
+        # Compute the perpendicular distance to a line (works both for horizontal and diagonal needle path)
         distance_from_line = (a*(xm[0]+np.cos(alpha)*250)-1*(xm[1]+ np.sin(alpha)*250) +b)/np.sqrt(a**2+(-1)**2)
         record_deviation_y.append(distance_from_line)
 
-        # Tissue stiffness matrix which gives a feedback force depending on how far reference pos for needle is from needle orientation
-        tissue_stiffness_matrix = np.diag([10,1000])
+        # Set tissue stiffness matrix depending on tissue stiffness (assumed equal for all tissues), normal force acting on needle
+        # depends on how far reference pos for needle is from projected needle path. 
+        tissue_stiffness_matrix = np.diag([1000,1000])
 
         # Compute the force and scale with respective angle along x and y axis.
         needle_offset_force = (tissue_stiffness_matrix * distance_from_line)*np.array([np.sin(alpha), np.cos(alpha)])
 
-        # Add the needle_offset_force to the endpoint force 
-        fe += [needle_offset_force[0,0], needle_offset_force[1,1]]  
+        # Add the needle_offset_force to the endpoint force (note that sign of force in x-direction flips if alpha != 0)
+        if alpha != 0:
+            fe += [-needle_offset_force[0,0], needle_offset_force[1,1]]  
+        else:
+            fe += [needle_offset_force[0,0], needle_offset_force[1,1]]  
+        
+        # We will use the normal force exerted on the needle by the tissue layers to implement kinetic friction 
+        # (note that for every layer passed the kinetic friction increases as the amount of tissues exerting friction increases)
+        if alpha == 0 and dxh[0] > 0:
 
-        # We will use the needle offset force to approximate the normal force exerted on the needle by the tissue layers.
-        # This enables us to implement kinetic friction (note that for every layer passed the kinetic friction increases as the amount of tissues exerting friction increases)
-    
-        if alpha == 0:
-
-            extra_tissue_stiffness_matrix = np.diag([1000,0])
-
-            kinetic_friction_coefficient = 0.46
-
-            tissue_normal_force_x = np.abs((extra_tissue_stiffness_matrix * distance_from_line))[1,1]
-            tissue_normal_force_y = np.abs((extra_tissue_stiffness_matrix * distance_from_line))[0,0]
+            tissue_normal_force_x = (tissue_stiffness_matrix * distance_from_line)[0,0]
+            tissue_normal_force_y = (tissue_stiffness_matrix * distance_from_line)[1,1]
             
             # Note that the kinetic friction is based on normal force so F_x = mu_kinetic * Fn_y and F_y = mu_kinetic * Fn_x
-            frictional_force = tissue_normal_force_x*kinetic_friction_coefficient
-            fe[0] += -frictional_force
+            frictional_force = (tissue_normal_force_x*kinetic_friction_coefficient)*tissue_index
+
+            fe[0] += frictional_force
             
-        elif alpha !=0:
-            extra_tissue_stiffness_matrix = np.diag([1000,1000])
-            kinetic_friction_coefficient = 0.46
-            
-            tissue_normal_force = (extra_tissue_stiffness_matrix * distance_from_line)*np.array([np.cos(alpha), np.sin(alpha)])
-            
+        elif alpha !=0 and dxh[0] > 0:
+
+            tissue_normal_force = (tissue_stiffness_matrix * distance_from_line)*np.array([np.sin(alpha), np.cos(alpha)])
         
             # Note that the kinetic friction is based on normal force so F_x = mu_kinetic * Fn_y and F_y = mu_kinetic * Fn_x
-            frictional_force = kinetic_friction_coefficient*tissue_normal_force
+            frictional_force = (tissue_normal_force*kinetic_friction_coefficient)*tissue_index
 
-            fe[0] += frictional_force[0,0]
-            fe[1] += frictional_force[1,1]
+            fe[0] += frictional_force[1,1]
+            fe[1] += frictional_force[0,0]
+        else:
+            fe += np.array([0,0])
 
-    # Now that we have the normal force exerted by the tissue we can start implementing kinetic friction
-    
+    # Compute damping force acting on endpoint due to viscosity of current tissue layer
+    fd = -damping @ endpoint_velocity 
 
-    #find maximum force exerted
+    # Apply tissue specific cutting force to needle endpoint (only if needle is moving)
+    if any(value == True for value in collision_dict.values()) and dxh[0]>0:
+            cutting_force_x = cutting_force*np.cos(alpha)
+            cutting_force_y = cutting_force*np.sin(alpha)
+
+            fe[0] += -cutting_force_x
+            fe[1] += -cutting_force_y
+
+    # Find maximum exerted force during simulation for metric analysis
     if i>120:
         if fe[0] > max_force_exerted[0]:
             max_force_exerted[0] = fe[0]
         if fe[1] > max_force_exerted[1]:
             max_force_exerted[1] = fe[1]
-
-    # Compute damping force
-    fd = -damping @ endpoint_velocity 
     
-
-    
-    ######### Send computed forces to the device #########
+    ######################################## SEND COMPUTED FORCES TO THE DEVICE ########################################
     if port:
         fe[1] = -fe[1]  ##Flips the force on the Y=axis 
 
@@ -535,7 +564,7 @@ while run:
         if haptic_feedback:
             ddxh = fe 
         
-            #update velocity to accomodate damping
+            # Update velocity to accomodate damping
             dxh += ddxh*dt -fd
 
             # In case collision occurs with vertebrae simulate an infinitely stiff bone
@@ -553,24 +582,27 @@ while run:
             Bones = {'Vertebrae one', 'Vertebrae two', 'Vertebrae three', 'Vertebrae four', 'Vertebrae five', 'Vertebrae six'}
             for collision in collision_dict:
                 if collision not in Bones and collision_dict[collision] == True:
+
                     # Set the maximum tissue force, the maximum force exerted by needle pre-puncture
                     max_tissue_force = variable_dict[collision]['max_tissue_force']
-                    #print("Max tissue force: ", max_tissue_force)
-                    if collision == 'Spinal cord' and i>120:
+
+                    if collision == 'Spinal cord' and i > 120:
                         spinal_coord_collision_hit = True
                         spinal_coord_collision = True
                     else:
                         spinal_coord_collision = False
+
                     # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
                     if update_bool and i>120:
                         phold = xh
                         variable_dict[collision]['update_bool'] = False
 
-                    penetration_bool = variable_dict[collision]['penetration_bool']
+                    
 
                     # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
+                    penetration_bool = variable_dict[collision]['penetration_bool']
                     if not penetration_bool:
-                        F_pen = (reference_pos[0]-phold[0])*0.1*math.cos(alpha)
+                        F_pen = 0.5*(reference_pos[0]-phold[0])*math.cos(alpha)
                     else:
                         F_pen = 0
                     
@@ -583,24 +615,18 @@ while run:
                     elif not penetration_bool:
                         dxh = np.zeros(2)
         else:
+
+            # Loop over this if haptic feedback is turned
             ddxh = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh)) 
             dxh += ddxh*dt
 
-                
-                
         if all(value == False for value in collision_dict.values()):
             for collision in collision_dict:
                 if collision not in Bones:
                     variable_dict[collision]['penetration_bool'] = False
                     variable_dict[collision]['update_bool'] = True
-                  
 
-                    
-        #dxh = (K_TISSUE/D_TISSUE*(xm-xh)/window_scale -fe/D_TISSUE)  ####replace with the valid expression that takes all the forces into account
-        #dxh = dxh*window_scale
-        #xh = np.round(xh+dxh)             ##update new positon of the end effector 
-        # 
-        #  
+        # Loop trough remaining integration steps       
         xhhold = xh
         xh = dxh*dt + xh
         i += 1
@@ -608,7 +634,7 @@ while run:
    
     haptic.center = xh 
 
-    ######### Graphical output #########
+    ######################################## Graphical output ########################################
     ##Render the haptic surface
     screenHaptics.fill(cWhite)
     
@@ -621,7 +647,7 @@ while run:
     pygame.draw.rect(screenHaptics, colorMaster, haptic,border_radius=4)
     
     
-    ######### Robot visualization ###################
+    ######################################## Robot visualization ########################################
     # update individual link position
     if robotToggle:
         robot.createPantograph(screenHaptics,xh)
@@ -729,7 +755,6 @@ while run:
         if collision_dict['Cerebrospinal fluid one']:
             GB = min(255, max(0, round(255 * 0.5)))
             window.fill((GB, 255, GB), special_flags = pygame.BLEND_MULT)
-
     
     pygame.display.flip()   
 
@@ -742,7 +767,7 @@ pygame.quit()
 record_deviation_y = np.array(record_deviation_y)
 std_y = np.std(record_deviation_y)
 
-#save metrics to the csv file
+# save metrics to the csv file
 d = [['Participant'],
      ['Haptic feedback: ', haptic_feedback],
      ['Time taken: ','{0:.2f}'.format(t),' s'],
