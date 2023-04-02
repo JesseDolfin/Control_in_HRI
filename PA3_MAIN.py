@@ -144,14 +144,14 @@ D_TISSUE_CORD   = 14   # dens = 1.075/L
 D_TISSUE_CART   = 14.4 # dens = 1.1kg/L
 
 #  Set all environment parameters to simulate elastic stiffness force upon contact in the various tissue layers
-MAX_TISSUE_SKIN     = 6.0  #1 #6.037
-MAX_TISSUE_FAT      = 2.2  #0.36 #2.2
-MAX_TISSUE_SUPRA    = 9.0  #1.49 #9
-MAX_TISSUE_INTER    = 7.5  #1.24 #7.5
-MAX_TISSUE_FLAVUM   = 12.1 #12.1
-MAX_TISSUE_FLUID    = 2.4  #0.4 #2.4
-MAX_TISSUE_CORD     = 2.4  #0.4 #2.4
-MAX_TISSUE_CART     = 50.0 #5 #
+MAX_TISSUE_SKIN     = 6000#6.0  #1 #6.037
+MAX_TISSUE_FAT      = 2200#2.2  #0.36 #2.2
+MAX_TISSUE_SUPRA    = 9000#9.0  #1.49 #9
+MAX_TISSUE_INTER    = 7500#7.5  #1.24 #7.5
+MAX_TISSUE_FLAVUM   = 12100#12.1 #12.1
+MAX_TISSUE_FLUID    = 2400#2.4  #0.4 #2.4
+MAX_TISSUE_CORD     = 2400#2.4  #0.4 #2.4
+MAX_TISSUE_CART     = 50000#50.0 #5 #
 
 #  Set all environment parameters to simulate tissue cutting force upon traversing the various tissue layers
 CUTTING_FORCE_SKIN   = 6037
@@ -292,40 +292,40 @@ window_scale = 3
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
 previous_cursor = None
-smoothing_factor = 0.2
+smoothing_factor = 0.1
 proceed = False
-run = True
-while run:
-    for event in pygame.event.get(): # interrupt function
-        if event.type == pygame.KEYUP:
-            if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
-                run = False
-            if event.key == ord('e') and not proceed:
-                proceed = not proceed
+# run = True
+# while run:
+#     for event in pygame.event.get(): # interrupt function
+#         if event.type == pygame.KEYUP:
+#             if event.key == ord('e') and proceed: # enter the main loop after 'e' is pressed
+#                 run = False
+#             if event.key == ord('e') and not proceed:
+#                 proceed = not proceed
 
-    # Create black canvas to which text can be written
-    window.blit(screenHaptics, (0,0))
-    window.blit(screenVR, (600,0))
+#     # Create black canvas to which text can be written
+#     window.blit(screenHaptics, (0,0))
+#     window.blit(screenVR, (600,0))
 
-    if not proceed:
-        # Create text to be displayed
-        text_image   = pygame.image.load("intro.png")
+#     if not proceed:
+#         # Create text to be displayed
+#         text_image   = pygame.image.load("intro.png")
         
-        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
-        intro_image  = pygame.transform.scale(intro_image,(600,300))
-        screenHaptics.blit(text_image,(0,0)) 
-        screenVR.blit(intro_image,(0,0)) 
+#         intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+#         intro_image  = pygame.transform.scale(intro_image,(600,300))
+#         screenHaptics.blit(text_image,(0,0)) 
+#         screenVR.blit(intro_image,(0,0)) 
 
-        pygame.display.flip()  
-    elif proceed:
-        text_image   = pygame.image.load("intro_2.png")
+#         pygame.display.flip()  
+#     elif proceed:
+#         text_image   = pygame.image.load("intro_2.png")
         
-        intro_image  = pygame.image.load("intro_image.png").convert_alpha()
-        intro_image  = pygame.transform.scale(intro_image,(600,300))
-        screenHaptics.blit(text_image,(0,0)) 
-        screenVR.blit(intro_image,(0,0)) 
+#         intro_image  = pygame.image.load("intro_image.png").convert_alpha()
+#         intro_image  = pygame.transform.scale(intro_image,(600,300))
+#         screenHaptics.blit(text_image,(0,0)) 
+#         screenVR.blit(intro_image,(0,0)) 
 
-        pygame.display.flip()  
+#         pygame.display.flip()  
 
     
 
@@ -333,9 +333,9 @@ run = True
 while run:
 
     # Initialize that simulation ends as soon as spinal coord is hit. 
-    if collision_dict['Spinal cord']:
-        time.sleep(1.5)
-        run = False
+    # if collision_dict['Spinal cord']:
+    #     time.sleep(1.5)
+    #     run = False
 
     # Set some booleans
     penetration    = True
@@ -511,7 +511,7 @@ while run:
 
         # Set tissue stiffness matrix depending on tissue stiffness (assumed equal for all tissues), normal force acting on needle
         # depends on how far reference pos for needle is from projected needle path. 
-        tissue_stiffness_matrix = np.diag([1000,1000])
+        tissue_stiffness_matrix = np.diag([750,750])
 
         # Compute the force and scale with respective angle along x and y axis.
         needle_offset_force = (tissue_stiffness_matrix * distance_from_line)*np.array([np.sin(alpha), np.cos(alpha)])
@@ -615,7 +615,7 @@ while run:
                     # Compute total endpoint force applied to haptic by the user and check if it exceeds the penetration threshold
                     penetration_bool = variable_dict[collision]['penetration_bool']
                     if not penetration_bool:
-                        F_pen = 0.5*(reference_pos[0]-phold[0])*math.cos(alpha)
+                        F_pen = (K @ (xm-xh) - (2*0.7*np.sqrt(np.abs(K)) @ dxh))[0]*np.cos(alpha) 
                     else:
                         F_pen = 0
                     
@@ -789,7 +789,7 @@ d = [['Participant'],
      ['Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0])*2,' mm'],
      ['Number of bone hits: ',int(bone_collision_count)],
      ['Spinal coord hit: ',spinal_coord_collision_hit],
-     ['Maximum exerted force: ',max_force_exerted/10000],
+     ['Maximum exerted force: ',max_force_exerted/1000],
      ['Deviation inside of tissue: ',std_y],
      ['']]
 
