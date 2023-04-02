@@ -784,7 +784,7 @@ std_y = np.std(record_deviation_y)
 
 # save metrics to the csv file
 d = [
-     ['Haptic feedback: ', haptic_feedback,'Time taken: ','{0:.2f}'.format(t),' s','Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0])*2,' mm','Number of bone hits: ',int(bone_collision_count),'Spinal coord hit: ',spinal_coord_collision_hit,'Maximum exerted force: ',max_force_exerted/10000,'Deviation inside of tissue: ',std_y]
+     ['Haptic feedback: ', haptic_feedback,'Time taken: ','{0:.2f}'.format(t),' s','Distance to fluid: ',(wall_layer6[0] - haptic_endpoint[0])*2,' mm','Number of bone hits: ',int(bone_collision_count),'Spinal coord hit: ',spinal_coord_collision_hit,'Maximum exerted force X: ',max_force_exerted[0]/10000,'Maximum exerted force Y: ',max_force_exerted[1]/10000,'Deviation inside of tissue: ',std_y]
 
      ]
 
