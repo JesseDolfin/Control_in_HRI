@@ -129,6 +129,7 @@ spinal_coord_collision = False
 toggle_visual = True
 haptic_feedback = True
 proceed = False
+visual_feedback = True
 
 force_time =[]
    
@@ -333,9 +334,9 @@ run = True
 while run:
 
     # Initialize that simulation ends as soon as spinal coord is hit. 
-    # if collision_dict['Spinal cord']:
-    #     time.sleep(1.5)
-    #     run = False
+    if collision_dict['Spinal cord']:
+        time.sleep(1.5)
+        run = False
 
     # Set some booleans
     penetration    = True
@@ -361,7 +362,7 @@ while run:
                 needle_rotation -= 5
                 alpha -= np.deg2rad(5)
 
-            # Toggle between visual feedback or not
+            # Toggle between layers displayed or not
             if event.key == ord('v'):
                 toggle_visual = not toggle_visual
             
@@ -371,6 +372,8 @@ while run:
                 proceed = not proceed
             if event.key == ord('d'):
                 debugToggle = not debugToggle
+            if event.key == ord('o'):
+                visual_feedback = not visual_feedback
                 
     ######################################## Read position (Haply and/or Mouse)  ########################################
     
@@ -709,7 +712,7 @@ while run:
     if haptic_feedback:
         # Indicate drop in needle pressure
         
-        if collision_dict['Cerebrospinal fluid one'] and i > 350:
+        if collision_dict['Cerebrospinal fluid one'] and i > 350 and visual_feedback:
             text_surface = font.render('Needle pressure is dropping!', False, (0,0,0))
             screenVR.blit(text_surface, (0, 75))
 
@@ -759,7 +762,7 @@ while run:
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
     force_time.append(fe[0])
-    if haptic_feedback:
+    if haptic_feedback and visual_feedback:
         if collision_dict['Spinal cord']:
             spinal_coord_collision_hit = True
             GB = min(255, max(0, round(255 * 0.5)))
