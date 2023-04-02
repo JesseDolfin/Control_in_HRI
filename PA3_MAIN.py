@@ -9,6 +9,8 @@ import sys, serial, glob
 from serial.tools import list_ports
 import time
 import pandas as pd
+from scipy.signal import butter, lfilter, freqz
+
 
 ##################### General Pygame Init #####################
 def rotMat(angle):
@@ -25,6 +27,7 @@ def compute_line(begin_pos, end_pos):
     b = (y2-a*x2)
     
     return a, b
+
 
 
 ##initialize pygame window
@@ -126,6 +129,8 @@ spinal_coord_collision = False
 toggle_visual = True
 haptic_feedback = True
 proceed = False
+
+force_time =[]
    
 # Set all environment parameters to simulate damping in the various tissue layers
 # Damping values are relative to each other based on tissue density
@@ -286,7 +291,8 @@ window_scale = 3
 ##TODO - Perhaps it needs to be changed by a timer for real-time see: 
 ##https://www.pygame.org/wiki/ConstantGameSpeed
 
-
+previous_cursor = None
+smoothing_factor = 0.2
 proceed = False
 run = True
 while run:
@@ -363,6 +369,8 @@ while run:
                 haptic_feedback = not haptic_feedback
             if event.key == ord('p'):
                 proceed = not proceed
+            if event.key == ord('d'):
+                debugToggle = not debugToggle
                 
     ######################################## Read position (Haply and/or Mouse)  ########################################
     
@@ -384,12 +392,17 @@ while run:
         ##Compute distances and forces between blocks
         xh = np.array(haptic.center)
         
-        ##Get mouse position
-        cursor = pygame.mouse.get_pos()
+        ## Apply low pass filter to mouse position
+        if i != 0:
+            cursor = pygame.mouse.get_pos()
+            cursor = [smoothing_factor*cursor[0] + (1-smoothing_factor)*previous_cursor[0], smoothing_factor*cursor[1] + (1-smoothing_factor)*previous_cursor[1]]
+
+        else:
+            cursor = pygame.mouse.get_pos()
         xm = np.array(cursor) 
     
     ######################################## COMPUTE COLLISIONS WITH ANY TISSUE ########################################
-    
+
     # Define haptic center and endpoint of our haptic (needle tip)
     haptic_endpoint = pygame.Rect(haptic.center[0]+np.cos(alpha)*250,haptic.center[1]+np.sin(alpha)*250, 1, 1)
     
@@ -562,7 +575,7 @@ while run:
         time.sleep(0.001)
     else: 
         if haptic_feedback:
-            ddxh = fe 
+            ddxh = fe
         
             # Update velocity to accomodate damping
             dxh += ddxh*dt -fd
@@ -745,7 +758,7 @@ while run:
                             "  fe = " + str(np.round(10*fe)/20000) \
                             , True, (0, 0, 0), (255, 255, 255))
         window.blit(text, textRect)
-
+    force_time.append(fe[0])
     if haptic_feedback:
         if collision_dict['Spinal cord']:
             spinal_coord_collision_hit = True
@@ -756,7 +769,9 @@ while run:
             GB = min(255, max(0, round(255 * 0.5)))
             window.fill((GB, 255, GB), special_flags = pygame.BLEND_MULT)
     
-    pygame.display.flip()   
+    pygame.display.flip()  
+
+    previous_cursor = cursor 
 
     ##Slow down the loop to match FPS
     clock.tick(FPS)
@@ -780,3 +795,10 @@ d = [['Participant'],
 
 df = pd.DataFrame(data=d)
 df.to_csv('test_csv.csv',mode='a',header=False,index=False)
+
+xs = [x for x in range(len(force_time[150:]))]
+
+plt.plot(xs, force_time[150:])
+plt.show()
+# Make sure to close the plt object once done
+plt.close()
