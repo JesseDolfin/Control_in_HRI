@@ -26,17 +26,17 @@ class secondary_task():
         if self.port:
             print("Board found on port %s"%self.port[0])
             self.haplyBoard = Board("test", self.port[0], 0)
-            device = Device(5, self.haplyBoard)
+            self.device = Device(5, self.haplyBoard)
             self.pantograph = Pantograph()
-            device.set_mechanism(self.pantograph)
+            self.device.set_mechanism(self.pantograph)
             
-            device.add_actuator(1, self.CCW, 2)
-            device.add_actuator(2, self.CW, 1)
+            self.device.add_actuator(1, self.CCW, 2)
+            self.device.add_actuator(2, self.CW, 1)
             
-            device.add_encoder(1, self.CCW, 241, 10752, 2)
-            device.add_encoder(2, self.CW, -61, 10752, 1)
+            self.device.add_encoder(1, self.CCW, 241, 10752, 2)
+            self.device.add_encoder(2, self.CW, -61, 10752, 1)
             
-            device.device_set_parameters()
+            self.device.device_set_parameters()
         else:
             print("No compatible device found. Running virtual environnement...")
             #sys.exit(1)
@@ -410,12 +410,12 @@ class secondary_task():
                 
                 ## Apply low pass filter to mouse position
                 if self.i != 0:
-                    cursor = pygame.mouse.get_pos()
-                    cursor = [self.smoothing_factor*cursor[0] + (1-self.smoothing_factor)*self.previous_cursor[0], self.smoothing_factor*cursor[1] + (1-self.smoothing_factor)*self.previous_cursor[1]]
+                    self.cursor = pygame.mouse.get_pos()
+                    self.cursor = [self.smoothing_factor*self.cursor[0] + (1-self.smoothing_factor)*self.previous_cursor[0], self.smoothing_factor*self.cursor[1] + (1-self.smoothing_factor)*self.previous_cursor[1]]
 
                 else:
-                    cursor = pygame.mouse.get_pos()
-                self.xm = np.array(cursor) 
+                    self.cursor = pygame.mouse.get_pos()
+                self.xm = np.array(self.cursor) 
             
             ######################################## COMPUTE COLLISIONS WITH ANY TISSUE ########################################
 
@@ -447,15 +447,15 @@ class secondary_task():
             
             # Check if any of the drawn vertebrae are in collision with the needle tip, if so flip boolean to limit needle movement later in pipeline
             if vert1_collision or vert2_collision or vert3_collision or vert4_collision or vert5_collision:
-                collision_bone = True
+                self.collision_bone = True
 
             # Initialize zero endpoint force and reference position based on cursor or Haply
-            fe = np.zeros(2)
-            self.reference_pos  = cursor
+            self.fe = np.zeros(2)
+            self.reference_pos  = self.cursor
             
             # Update the collision dict to all False to reset collision dict 
             self.collision_dict.update((value, False) for value in self.collision_dict)
-            collision_flag = False
+            self.collision_flag = False
             
             # Loop over all the objects and check for collision
             for value in self.objects_dict:
@@ -463,7 +463,7 @@ class secondary_task():
 
                 # If collision is detected in specific layer only update this value to True
                 if Collision:
-                    collision_any = True
+                    self.collision_any = True
                     self.collision_dict.update({value: True})
                 
             ######################################## UPDATE ENVIRONMENT PARAMETERS BASED ON COLLISIONS ########################################
@@ -478,44 +478,44 @@ class secondary_task():
                     # For the objects(tissues) in collision with the needle tip set the damping value and tissue cuttin force of the environment accordingly
                     # Additionally, flip position, collision boolean and tissue layer index.
                     
-                    damping        = self.variable_dict[collision]['D_TISSUE'] * self.K
-                    cutting_force  = self.variable_dict[collision]['tissue_cutting_force']
-                    collision_bool = self.variable_dict[collision]['collision_bool']
-                    update_bool    = self.variable_dict[collision]['update_bool']
-                    tissue_index   = list(self.variable_dict).index(collision) + 1  #We start counting index at zero so +1 for further computation
+                    self.damping        = self.variable_dict[collision]['D_TISSUE'] * self.K
+                    self.cutting_force  = self.variable_dict[collision]['tissue_cutting_force']
+                    self.collision_bool = self.variable_dict[collision]['collision_bool']
+                    self.update_bool    = self.variable_dict[collision]['update_bool']
+                    self.tissue_index   = list(self.variable_dict).index(collision) + 1  #We start counting index at zero so +1 for further computation
             
             
             # In case no collisions are detected default the damping value and tissue cutting force of the environment to zero
             if all(value == False for value in self.collision_dict.values()):
-                damping          = np.zeros(2)
-                cutting_force    = 0
+                self.damping          = np.zeros(2)
+                self.cutting_force    = 0
             
             # Check if any of the rectangular vertebrae are in collision, if so flip bone collision boolean to limit needle movement
             if self.collision_dict['Vertebrae one'] or self.collision_dict['Vertebrae two'] or self.collision_dict['Vertebrae three'] or self.collision_dict['Vertebrae four'] or self.collision_dict['Vertebrae five'] or self.collision_dict['Vertebrae six']:
-                collision_bone = True
+                self.collision_bone = True
             else:
                 pass
             
             ######################################## FORCE FEEDBACK COMPUTATIONS + IMPEDANCE CONTROL ########################################
         
             # Calculate endpoint velocity and update previous haptic state
-            endpoint_velocity = (self.xhold - self.xh)/self.FPS
+            self.endpoint_velocity = (self.xhold - self.xh)/self.FPS
             self.xhold = self.xh
 
             # Calculate force feedback from impedance controller 
-            fe = (self.K @ (self.xm-self.xh) - (2*0.7*np.sqrt(np.abs(self.K)) @ self.dxh))
+            self.fe = (self.K @ (self.xm-self.xh) - (2*0.7*np.sqrt(np.abs(self.K)) @ self.dxh))
             
             # Fix the proxy position of needle contact point with skin and update only when no contact is made with any tissue (so when needle is retracted)
             if self.update_prox and self.collision_dict['Skin']:
                 begin_pos = (self.haptic.center[0],self.haptic.center[1])
                 end_pos   = (self.haptic.center[0]+np.cos(self.alpha)*250, self.haptic.center[1]+ np.sin(self.alpha)*250)
-                a,b = self.compute_line(begin_pos, end_pos)
+                self.a,self.b = self.compute_line(begin_pos, end_pos)
 
                 self.update_prox = False
 
             # Enable needle proxy position update as soon as no contact is made with any tissue (so when needle is retracted)
             if all(value == False for value in self.collision_dict.values()):
-                update_prox = True
+                self.update_prox = True
 
             # If collision exists with any tissue layer create a virtual needle path along the needle
             # to compute tissues normal force acting on needle when moving inside tissue 
@@ -534,67 +534,67 @@ class secondary_task():
 
                 # Add the needle_offset_force to the endpoint force (note that sign of force in x-direction flips if alpha != 0)
                 if self.alpha != 0:
-                    fe += [-needle_offset_force[0,0], needle_offset_force[1,1]]  
+                    self.fe += [-needle_offset_force[0,0], needle_offset_force[1,1]]  
                 else:
-                    fe += [needle_offset_force[0,0], needle_offset_force[1,1]]  
+                    self.fe += [needle_offset_force[0,0], needle_offset_force[1,1]]  
                 
                 # We will use the normal force exerted on the needle by the tissue layers to implement kinetic friction 
                 # (note that for every layer passed the kinetic friction increases as the amount of tissues exerting friction increases)
                 if self.alpha == 0 and self.dxh[0] > 0:
 
-                    tissue_normal_force_x = (tissue_stiffness_matrix * distance_from_line)[0,0]
-                    tissue_normal_force_y = (tissue_stiffness_matrix * distance_from_line)[1,1]
+                    self.tissue_normal_force_x = (tissue_stiffness_matrix * distance_from_line)[0,0]
+                    self.tissue_normal_force_y = (tissue_stiffness_matrix * distance_from_line)[1,1]
                     
                     # Note that the kinetic friction is based on normal force so F_x = mu_kinetic * Fn_y and F_y = mu_kinetic * Fn_x
-                    frictional_force = (tissue_normal_force_x*self.kinetic_friction_coefficient)*tissue_index
+                    frictional_force = (self.tissue_normal_force_x*self.kinetic_friction_coefficient)*self.tissue_index
 
-                    fe[0] += frictional_force
+                    self.fe[0] += frictional_force
                     
                 elif self.alpha !=0 and self.dxh[0] > 0:
 
                     tissue_normal_force = (tissue_stiffness_matrix * distance_from_line)*np.array([np.sin(self.alpha), np.cos(self.alpha)])
                 
                     # Note that the kinetic friction is based on normal force so F_x = mu_kinetic * Fn_y and F_y = mu_kinetic * Fn_x
-                    frictional_force = (tissue_normal_force*self.kinetic_friction_coefficient)*tissue_index
+                    frictional_force = (tissue_normal_force*self.kinetic_friction_coefficient)*self.tissue_index
 
-                    fe[0] += frictional_force[1,1]
-                    fe[1] += frictional_force[0,0]
+                    self.fe[0] += frictional_force[1,1]
+                    self.fe[1] += frictional_force[0,0]
                 else:
-                    fe += np.array([0,0])
+                    self.fe += np.array([0,0])
 
             # Compute damping force acting on endpoint due to viscosity of current tissue layer
-            fd = -damping @ endpoint_velocity 
+            self.fd = -self.damping @ self.endpoint_velocity 
 
             # Apply tissue specific cutting force to needle endpoint (only if needle is moving)
             if any(value == True for value in self.collision_dict.values()) and self.dxh[0]>0:
-                    cutting_force_x = cutting_force*np.cos(self.alpha)
-                    cutting_force_y = cutting_force*np.sin(self.alpha)
+                    cutting_force_x = self.cutting_force*np.cos(self.alpha)
+                    cutting_force_y = self.cutting_force*np.sin(self.alpha)
 
-                    fe[0] += -cutting_force_x
-                    fe[1] += -cutting_force_y
+                    self.fe[0] += -cutting_force_x
+                    self.fe[1] += -cutting_force_y
 
             # Find maximum exerted force during simulation for metric analysis
             if self.i>120:
-                if fe[0] > self.max_force_exerted[0]:
-                    self.max_force_exerted[0] = fe[0]
-                if fe[1] > self.max_force_exerted[1]:
-                    self.max_force_exerted[1] = fe[1]
+                if self.fe[0] > self.max_force_exerted[0]:
+                    self.max_force_exerted[0] = self.fe[0]
+                if self.fe[1] > self.max_force_exerted[1]:
+                    self.max_force_exerted[1] = self.fe[1]
             
             ######################################## SEND COMPUTED FORCES TO THE DEVICE ########################################
             if self.port:
-                fe[1] = -fe[1]  ##Flips the force on the Y=axis 
+                self.fe[1] = -self.fe[1]  ##Flips the force on the Y=axis 
 
                 ##Update the forces of the device
-                self.device.set_device_torques(fe)
+                self.device.set_device_torques(self.fe)
                 self.device.device_write_torques()
                 #pause for 1 millisecond
                 time.sleep(0.001)
             else: 
                 if self.haptic_feedback:
-                    self.ddxh = fe
+                    self.ddxh = self.fe
                 
                     # Update velocity to accomodate damping
-                    self.dxh += self.ddxh*self.dt -fd
+                    self.dxh += self.ddxh*self.dt -self.fd
 
                     # In case collision occurs with vertebrae simulate an infinitely stiff bone
                     if self.collision_bone and self.away_from_bone:
@@ -616,13 +616,13 @@ class secondary_task():
                             max_tissue_force = self.variable_dict[collision]['max_tissue_force']
 
                             if collision == 'Spinal cord' and self.i > 120:
-                                spinal_coord_collision_hit = True
-                                spinal_coord_collision = True
+                                self.spinal_coord_collision_hit = True
+                                self.spinal_coord_collision = True
                             else:
-                                spinal_coord_collision = False
+                                self.spinal_coord_collision = False
 
                             # Check if collision has occured and fix the current position of the haptic as long as no puncture has occured 
-                            if update_bool and self.i>120:
+                            if self.update_bool and self.i>120:
                                 phold = self.xh
                                 self.variable_dict[collision]['update_bool'] = False
 
@@ -771,10 +771,10 @@ class secondary_task():
                 text = self.font.render("FPS = " + str(round(self.clock.get_fps())) + \
                                     "  xm = " + str(np.round(10*self.xm)/20000) +\
                                     "  xh = " + str(np.round(10*self.xh)/20000) +\
-                                    "  fe = " + str(np.round(10*fe)/20000) \
+                                    "  fe = " + str(np.round(10*self.fe)/20000) \
                                     , True, (0, 0, 0), (255, 255, 255))
                 self.window.blit(text, self.textRect)
-            self.force_time.append(fe[0])
+            self.force_time.append(self.fe[0])
             if self.haptic_feedback and self.visual_feedback:
                 if self.collision_dict['Spinal cord']:
                     self.spinal_coord_collision_hit = True
@@ -787,7 +787,7 @@ class secondary_task():
             
             pygame.display.flip()  
 
-            self.previous_cursor = cursor 
+            self.previous_cursor = self.cursor 
 
             ##Slow down the loop to match FPS
             self.clock.tick(self.FPS)
