@@ -5,8 +5,8 @@ Created on Mon Feb  7 16:02:10 2022
 @author: willemet.l
 """
 
-from pyhapi import Mechanisms
-from pantograph import Pantograph
+from .pyhapi import Mechanisms
+from .pantograph import Pantograph
 import math
 import numpy as np
 import pygame

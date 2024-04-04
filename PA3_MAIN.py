@@ -1,15 +1,21 @@
+#!/usr/bin/env python
+
+
 import pygame
 import numpy as np
 import matplotlib.pyplot as plt
-from pantograph import Pantograph
-from pyhapi import Board, Device, Mechanisms
-from pshape import PShape
+from .pantograph import Pantograph
+from .pyhapi import Board, Device, Mechanisms
+from .pshape import PShape
 import serial
 from serial.tools import list_ports
 import time
 import pandas as pd
 import os
 import uuid
+import random
+import sys
+import time
 
 class secondary_task():
     def __init__(self):
@@ -21,6 +27,9 @@ class secondary_task():
         self.SimpleActuatorMech = Mechanisms
         self.pantograph = Pantograph
         self.robot = PShape
+
+        self.spine_hit_count = 0
+        self.success_count = 0
 
         self.port = self.serial_ports()   ##port contains the communication port or False if no device
         if self.port:
@@ -53,6 +62,9 @@ class secondary_task():
         self.directory_path = os.path.dirname(self.file_path)
         self.icon_path = os.path.join(self.directory_path,"robot.png")
         self.vertebra_path = os.path.join(self.directory_path,"vertebra_test.png")
+        self.intro_1 = os.path.join(self.directory_path,"intro.png")
+        self.intro_2 = os.path.join(self.directory_path,"intro_2.png")
+        self.intro_img = os.path.join(self.directory_path,"intro_image.png")
 
 
         ##add nice icon from https://www.flaticon.com/authors/vectors-market
@@ -61,6 +73,7 @@ class secondary_task():
 
         ##add text on top to debugToggle the timing and forces
         self.font = pygame.font.Font('freesansbold.ttf', 14)
+        self.font_low_time = pygame.font.Font('freesansbold.ttf', 20)
 
         pygame.mouse.set_visible(True)     ##Hide cursor by default. 'm' toggles it
         
@@ -74,7 +87,9 @@ class secondary_task():
 
         ##initialize "real-time" clock
         self.clock = pygame.time.Clock()
-        self.FPS = 400   #in Hertz
+        self.FPS = 500   #in Hertz
+
+        self.max_time = 30 # seconds
 
         ## Define colors to be used to render different tissue layers and haptic
         self.cSkin      = (210,161,140)
@@ -89,6 +104,13 @@ class secondary_task():
         self.cOrange = (255,100,0)
         self.cWhite  = (255,255,255)
 
+
+        self.start_screen()
+        self.initialise()
+
+    def initialise(self):
+
+        
         ####Pseudo-haptics dynamic parameters, k/b needs to be <1
         self.K_TISSUE = .5      ##Stiffness between cursor and haptic display
         self.D = 1.5      ##Viscous of the pseudohaptic display
@@ -106,8 +128,8 @@ class secondary_task():
         self.vertebrae_rect   = self.vertebrae_mask.get_rect()
 
         self.haptic  = pygame.Rect(*self.screenHaptics.get_rect().center, 0, 0).inflate(40,40)
-        self.cursor  = pygame.Rect(0, 0, 5, 5)
-        self.colorHaptic = self.cOrange ##color of the wall
+        self.cursor  = pygame.mouse.get_pos()
+        self.colorHaptic = self.cOrange #color of the wall
 
         '''Init all variables'''
         self.xh = np.array(self.haptic.center,dtype='int32')
@@ -140,10 +162,10 @@ class secondary_task():
 
         # Declare some simulation booleans to switch between states
         self.robotToggle = True
-        self.debugToggle = True
+        self.debugToggle = False
         self.away_from_bone = True
         self.spinal_coord_collision = False
-        self.toggle_visual = True
+        self.toggle_visual = False
         self.haptic_feedback = True
         self.proceed = False
         self.visual_feedback = True
@@ -152,48 +174,48 @@ class secondary_task():
         
         # Set all environment parameters to simulate damping in the various tissue layers
         # Damping values are relative to each other based on tissue density
-        D_TISSUE_SKIN   = 14.4 # dens = 1.1kg/L
-        D_TISSUE_FAT    = 11.8 # dens = 0.9kg/L
-        D_TISSUE_SUPRA  = 15   # dens = 1.142kg/L
-        D_TISSUE_INTER  = 15   # dens = 1.142kg/L
-        D_TISSUE_FLAVUM = 15   # dens = 1.142kg/L
-        D_TISSUE_FLUID  = 13.2 # dens = 1.007kg/L
-        D_TISSUE_CORD   = 14   # dens = 1.075/L
-        D_TISSUE_CART   = 14.4 # dens = 1.1kg/L
+        D_TISSUE_SKIN   = 14.4 + random.randint(-1,1) # dens = 1.1kg/L
+        D_TISSUE_FAT    = 11.8 + random.randint(-1,1)# dens = 0.9kg/L
+        D_TISSUE_SUPRA  = 15   + random.randint(-1,1)# dens = 1.142kg/L
+        D_TISSUE_INTER  = 15   + random.randint(-1,1)# dens = 1.142kg/L
+        D_TISSUE_FLAVUM = 15   + random.randint(-1,1)# dens = 1.142kg/L
+        D_TISSUE_FLUID  = 13.2 + random.randint(-1,1)# dens = 1.007kg/L
+        D_TISSUE_CORD   = 14   + random.randint(-1,1)# dens = 1.075/L
+        D_TISSUE_CART   = 14.4 + random.randint(-1,1)# dens = 1.1kg/L
 
         #  Set all environment parameters to simulate elastic stiffness force upon contact in the various tissue layers
-        MAX_TISSUE_SKIN     = 6000#6.0  #1 #6.037
-        MAX_TISSUE_FAT      = 2200#2.2  #0.36 #2.2
-        MAX_TISSUE_SUPRA    = 9000#9.0  #1.49 #9
-        MAX_TISSUE_INTER    = 7500#7.5  #1.24 #7.5
-        MAX_TISSUE_FLAVUM   = 12000* 0.8 #Difficulty factor
-        MAX_TISSUE_FLUID    = 2400#2.4  #0.4 #2.4
-        MAX_TISSUE_CORD     = 2400#2.4  #0.4 #2.4
-        MAX_TISSUE_CART     = 50000#50.0 #5 #
+        MAX_TISSUE_SKIN     = 6000 + random.randint(-1,1)*1500 
+        MAX_TISSUE_FAT      = 2200 + random.randint(-1,1)*550
+        MAX_TISSUE_SUPRA    = 9000 + random.randint(-1,1)*2250
+        MAX_TISSUE_INTER    = 7500 + random.randint(-1,1)*1875
+        MAX_TISSUE_FLAVUM   = (12000 + random.randint(-1,1)*1000) * 1 #Difficulty factor
+        MAX_TISSUE_FLUID    = 2400 + random.randint(-1,1)*600
+        MAX_TISSUE_CORD     = 2400 + random.randint(-1,1)*600
+        MAX_TISSUE_CART     = 50000 + random.randint(-1,1)*10000
 
         #  Set all environment parameters to simulate tissue cutting force upon traversing the various tissue layers
-        CUTTING_FORCE_SKIN   = 6037
-        CUTTING_FORCE_FAT    = 2200
-        CUTTING_FORCE_SUPRA  = 9000
-        CUTTING_FORCE_INTER  = 7500
-        CUTTING_FORCE_FLAVUM = 12100
-        CUTTING_FORCE_FLUID  = 2400
-        CUTTING_FORCE_CORD   = 2400
-        CUTTING_FORCE_CART   = 50000
+        CUTTING_FORCE_SKIN   = 6037 + random.randint(-1,1)*1500 
+        CUTTING_FORCE_FAT    = 2200 + random.randint(-1,1)*550
+        CUTTING_FORCE_SUPRA  = 9000 + random.randint(-1,1)*2250 
+        CUTTING_FORCE_INTER  = 7500 + random.randint(-1,1)*1875 
+        CUTTING_FORCE_FLAVUM = 11100 + random.randint(-1,1)*1000 
+        CUTTING_FORCE_FLUID  = 2400 + random.randint(-1,1)*600
+        CUTTING_FORCE_CORD   = 2400 + random.randint(-1,1)*600
+        CUTTING_FORCE_CART   = 50000 + random.randint(-1,1)*10000
 
         # Initialize total simulation space occupied by human subject (start_pos, end_pos, difference)
         self.simulation_space  = [[400, 600, 300], [0, 300, 700]]
 
         # Initialize adjustable scaling factors to play around with tissue size 2 px / mm
-        wall_size_factor1 = 0.04      # SKIN , 5.6 mm 
-        wall_size_factor2 = 0.045     # FAT 
-        wall_size_factor3 = 1/150     # SUPRASPINAL LIGAMENT 0.72mm
-        wall_size_factor4 = 0.2       # INTERSPINAL LIGAMENT 30 mm
-        wall_size_factor5 = 0.03      # LIGAMENTUM FLAVUM 4.5 mm
-        wall_size_factor6 = 1/37.5    # CEREBROSPINAL FLUID 4 mm
-        wall_size_factor7 = 0.1       # SPINAL CORD 15 mm
-        wall_size_factor8 = 1/13      # VERTEBRAE ONE 11.5 mm
-        wall_size_factor9 = 0.393333  # CARTILAGE disk 118 mm
+        wall_size_factor1 = 0.04      + random.randint(-1,1)/400 # SKIN , 5.6 mm 
+        wall_size_factor2 = 0.045     + random.randint(-1,1)/400 # FAT 
+        wall_size_factor3 = 1/150     + random.randint(-1,1)/4000 # SUPRASPINAL LIGAMENT 0.72mm
+        wall_size_factor4 = 0.2       + random.randint(-1,1)/80# INTERSPINAL LIGAMENT 30 mm
+        wall_size_factor5 = 0.03      + random.randint(-1,1)/533 # LIGAMENTUM FLAVUM 4.5 mm
+        wall_size_factor6 = 1/37.5    + random.randint(-1,1)/550 # CEREBROSPINAL FLUID 4 mm
+        wall_size_factor7 = 0.1       + random.randint(-1,1)/160 # SPINAL CORD 15 mm
+        wall_size_factor8 = 1/13      + random.randint(-1,1)/200 # VERTEBRAE ONE 11.5 mm
+        wall_size_factor9 = 0.393333  + random.randint(-1,1)/40 # CARTILAGE disk 118 mm
         wall_size_factor10 = 1/11.5   # VERTEBRAE TWO 
 
         # Vertical wall layers (x, y, width, height)
@@ -263,6 +285,71 @@ class secondary_task():
         self.previous_cursor = None
         self.smoothing_factor = 0.1
         self.proceed = False
+
+        self.time_start = time.time()
+
+        self.run = True
+
+        self.run_simulation()
+
+    def start_screen(self):
+        self.run = True
+
+        # Create a surface for the button
+        button_surface = pygame.Surface((150, 50))
+        
+        # Render text on the button
+        font = pygame.font.Font(None, 24)
+        text = font.render("Start Simulation", True, (0, 0, 0))
+        text_rect = text.get_rect(center=(button_surface.get_width()/2, button_surface.get_height()/2))
+
+        # Create a pygame.Rect object that represents the button's boundaries
+        button_rect = pygame.Rect(0, 0, 150, 50)  # Adjust the position as needed
+
+
+
+        while self.run:
+            #Create black canvas to which text can be written
+            self.window.blit(self.screenHaptics, (0,0))
+            self.window.blit(self.screenVR, (600,0))
+
+            self.screenHaptics.fill(self.cWhite)
+
+
+            for event in pygame.event.get(): # interrupt function
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.QUIT: # enter the main loop after 'e' is pressed
+                        self.run = False
+                        pygame.display.quit()
+                        pygame.quit()     
+                    if event.key == ord('q'):   ##Force to quit
+                        self.run = False       
+
+                # Check for the mouse button down event
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    # Call the on_mouse_button_down() function
+                    if button_rect.collidepoint(event.pos):
+                        self.initialise()
+
+            # Check if the mouse is over the button. This will create the button hover effect
+            if button_rect.collidepoint(pygame.mouse.get_pos()):
+                pygame.draw.rect(button_surface, (127, 255, 212), (1, 1, 148, 48))
+            else:
+                pygame.draw.rect(button_surface, (0, 0, 0), (0, 0, 150, 50))
+                pygame.draw.rect(button_surface, (255, 255, 255), (1, 1, 148, 48))
+                pygame.draw.rect(button_surface, (0, 0, 0), (1, 1, 148, 1), 2)
+                pygame.draw.rect(button_surface, (0, 100, 0), (1, 48, 148, 10), 2)
+                
+                
+            
+            # Shwo the button text
+            button_surface.blit(text, text_rect)
+
+            # Draw the button on the screen
+            self.screenHaptics.blit(button_surface, (button_rect.x, button_rect.y))
+
+            # Update the game state
+            pygame.display.update()
 
 
 
@@ -342,14 +429,13 @@ class secondary_task():
 #         pygame.display.flip()  
 
     
-    def run_game(self):
-        run = True
-        while run:
-
+    def run_simulation(self):
+        needle_pressure = 500
+        while self.run:
             # Initialize that simulation ends as soon as spinal coord is hit. 
             if self.collision_dict['Spinal cord']:
                 time.sleep(1.5)
-                run = False
+                self.run = False
 
             # Set some booleans
             self.penetration    = True
@@ -360,12 +446,14 @@ class secondary_task():
             for event in pygame.event.get():
                 ##If the window is close then quit 
                 if event.type == pygame.QUIT:
-                    run = False
+                    self.run = False
                 elif event.type == pygame.KEYUP:
                     if event.key == ord('m'):   ##Change the visibility of the mouse
                         pygame.mouse.set_visible(not pygame.mouse.get_visible())  
                     if event.key == ord('q'):   ##Force to quit
-                        run = False          
+                        self.run = False   
+                        pygame.display.quit()
+                        pygame.quit()       
 
                     ##Rotate the needle
                     if event.key ==ord('r'):
@@ -707,8 +795,8 @@ class secondary_task():
             pygame.draw.rect(self.screenVR,self.cVerte,self.wall_layer16, border_radius = 4)
             pygame.draw.rect(self.screenVR,self.cVerte,self.wall_layer17, border_radius = 4)
 
-            # Draw all the vertebrae 
-            self.screenVR.blit(self.vertebrae_layer,(self.vert_rect1[0],self.vert_rect1[1])) 
+            # Draw all the vertebrae     
+            self.screenVR.blit(self.vertebrae_layer,(self.vert_rect1[0],self.vert_rect1[1]))
             self.screenVR.blit(self.vertebrae_layer,(self.vert_rect2[0],self.vert_rect2[1]))
             self.screenVR.blit(self.vertebrae_layer,(self.vert_rect3[0],self.vert_rect3[1]))
             self.screenVR.blit(self.vertebrae_layer,(self.vert_rect4[0],self.vert_rect4[1]))
@@ -726,8 +814,11 @@ class secondary_task():
                 # Indicate drop in needle pressure
                 
                 if self.collision_dict['Cerebrospinal fluid one'] and self.i > 350 and self.visual_feedback:
-                    text_surface = self.font.render('Needle pressure is dropping!', False, (0,0,0))
+                    text_surface = self.font.render(f'Needle pressure:{needle_pressure}', False, (0,0,0))
                     self.screenVR.blit(text_surface, (0, 75))
+                    needle_pressure -= 1
+                    
+
 
             #toggle a mask over the spine
             if self.toggle_visual:
@@ -755,11 +846,23 @@ class secondary_task():
             # Visualize toggles on display
             text_surface1 = self.font.render("Press 'e' to rotate needle up", True, (0, 0, 0),(255, 255, 255))
             text_surface2 = self.font.render("Press 'r' to rotate needle down", True,(0, 0, 0), (255, 255, 255))
-            text_surface3 = self.font.render("Press 'q' for epidural space", True, (0, 0, 0), (255, 255, 255))
+            text_surface3 = self.font.render("Press 'v' to hide epidural space", True, (0, 0, 0), (255, 255, 255))
 
+        
+            time_elpased =  time.time() - self.time_start
+            
+            time_left = self.max_time - time_elpased 
+            if time_left <= 10:
+                text_time = self.font_low_time.render(f"Time left for procedure: {time_left:.2f}",True,(255,0,0))
+                self.screenVR.blit(text_time,(0,270))
+            else:
+                text_time = self.font.render(f"Time left for procedure: {time_left:.2f}",True,(0,0,0)) # Display the time left to complete the simulation
+                self.screenVR.blit(text_time,(0,280))
+           
             self.screenVR.blit(text_surface1, (0, 0))
             self.screenVR.blit(text_surface2, (0, 20))
             self.screenVR.blit(text_surface3, (0, 40))
+            
 
             ##Fuse it back together
             self.window.blit(self.screenHaptics, (0,0))
@@ -789,8 +892,130 @@ class secondary_task():
 
             self.previous_cursor = self.cursor 
 
-            ##Slow down the loop to match FPS
+            #Slow down the loop to match FPS
             self.clock.tick(self.FPS)
+
+
+            if self.spinal_coord_collision:
+                self.run = False
+                self.spine_hit_count += 1
+                time.sleep(0.5)
+                self.end_screen()
+                
+
+            if needle_pressure <0:
+                self.run = False
+                self.success_count += 1
+                time.sleep(0.5)
+                self.end_screen()
+
+    def end_screen(self):
+        self.run = True
+
+        # Create a surface for the button
+        button_surface = pygame.Surface((150, 50))
+        
+        # Render text on the button
+        font = pygame.font.Font(None, 24)
+        text = font.render("Restart Simulation", True, (0, 0, 0))
+        font_message = pygame.font.Font(None, 38)
+        bad_text = font_message.render("You hit the patient's spine! Please try again", True, (217, 2, 2))
+        good_text_1 = font_message.render(f"You succesfully drained the fluid from", True, (2, 217, 30))
+        good_text_2 = font_message.render(f"the epidural space, well done!", True, (2, 217, 30))
+        hit_count_text = font.render(f"Spine hits:  {self.spine_hit_count}", True, (0, 0, 0))
+        success_text = font.render(f"Successes: {self.success_count}", True, (0, 0, 0))
+        completion_text = font.render(f"You succesfully completed: {self.spine_hit_count+self.success_count} simulation runs!", True, (0, 0, 0))
+        completion_text_2 = font.render(f"press 'q' to exit simulation", True, (0, 0, 0))
+        text_rect = text.get_rect(center=(button_surface.get_width()/2, button_surface.get_height()/2))
+
+        # Create a pygame.Rect object that represents the button's boundaries
+        button_rect = pygame.Rect(0, 0, 150, 50)  # Adjust the position as needed
+
+        tries = self.spine_hit_count+self.success_count
+        # Increase time constraint by 2 seconds after each successfull attempt
+        self.max_time = 30 - self.success_count*2
+
+
+
+        while self.run:
+            #Create black canvas to which text can be written
+            self.window.blit(self.screenHaptics, (0,0))
+            self.window.blit(self.screenVR, (600,0))
+
+            self.screenHaptics.fill(self.cWhite)
+
+
+            for event in pygame.event.get(): 
+                if event.type == pygame.KEYUP:
+                    if event.key == ord('q') and tries <10:   
+                        self.run = False 
+                        pygame.display.quit()
+                        pygame.quit()   
+                    elif event.key == ord('q') and tries >= 10:
+                        self.run = False
+                        self.save_stats()
+
+
+                # Check for the mouse button down event
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and tries < 10:
+                    # Call the on_mouse_button_down() function
+                    if button_rect.collidepoint(event.pos):
+                        self.initialise()
+
+            if tries < 10:
+                # Check if the mouse is over the button. This will create the button hover effect
+                if button_rect.collidepoint(pygame.mouse.get_pos()):
+                    pygame.draw.rect(button_surface, (127, 255, 212), (1, 1, 148, 48))
+                else:
+                    pygame.draw.rect(button_surface, (0, 0, 0), (0, 0, 150, 50))
+                    pygame.draw.rect(button_surface, (255, 255, 255), (1, 1, 148, 48))
+                    pygame.draw.rect(button_surface, (0, 0, 0), (1, 1, 148, 1), 2)
+                    pygame.draw.rect(button_surface, (0, 100, 0), (1, 48, 148, 10), 2)
+                    
+                # Show the button text
+                button_surface.blit(text, text_rect)
+                # Draw the button on the screen
+                self.screenHaptics.blit(button_surface, (button_rect.x, button_rect.y))
+
+                self.screenHaptics.blit(hit_count_text,(450,20))
+                self.screenHaptics.blit(success_text,(450,50))
+
+                # Draw respective good and bad text on screen
+                if self.spinal_coord_collision:
+                    self.screenHaptics.blit(bad_text,(20,120))
+                else:
+                    self.screenHaptics.blit(good_text_1,(20,120))
+                    self.screenHaptics.blit(good_text_2,(65,150))
+            else:
+                self.screenHaptics.blit(completion_text,(20,120))
+                self.screenHaptics.blit(completion_text_2,(20,140))
+                
+                
+
+            # Update the game state
+            pygame.display.update()
+
+
+            # if not proceed:
+            #     # Create text to be displayed
+            #     text_image   = pygame.image.load(self.intro_1)
+                
+            #     intro_image  = pygame.image.load(self.intro_img).convert_alpha()
+            #     intro_image  = pygame.transform.scale(intro_image,(600,300))
+            #     self.screenHaptics.blit(text_image,(0,0)) 
+            #     self.screenVR.blit(intro_image,(0,0)) 
+
+                
+            # elif proceed:
+            #     text_image   = pygame.image.load(self.intro_2)
+                
+            #     intro_image  = pygame.image.load(self.intro_img).convert_alpha()
+            #     intro_image  = pygame.transform.scale(intro_image,(600,300))
+            #     self.screenHaptics.blit(text_image,(0,0)) 
+            #     self.screenVR.blit(intro_image,(0,0)) 
+            #     run = False
+
+            #pygame.display.flip()  
 
     def save_stats(self):
 
@@ -822,5 +1047,4 @@ class secondary_task():
 
 if __name__ == '__main__':
     game = secondary_task()
-    game.run_game()
-    game.save_stats()
+    game.initialise()
